@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   searchBtn.addEventListener('click', () => {
     const query = inputEl.value.trim();
     if (!query) {
-      alert("Vui lòng nhập địa chỉ hoặc mã GNAF ID!");
+      alert("Please enter an address or GNAF ID.");
       return;
     }
 
