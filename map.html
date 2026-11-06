@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="lib/leaflet.css">
+  <style>
+    html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", sans-serif; }
+    #wrap { display: flex; flex-direction: column; height: 100%; }
+    #map { flex: 1; }
+    #info { font-size: 11px; padding: 6px 8px; background: #f1f5f9; color: #334155; border-top: 1px solid #e2e8f0; min-height: 28px; }
+    .pin { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid #2563eb;
+           display: flex; align-items: center; justify-content: center; font-size: 15px;
+           box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; }
+    .pin.house { background: #2563eb; border-color: #1e3a8a; width: 32px; height: 32px; }
+    .pin.active { border-color: #dc2626; transform: scale(1.15); }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="map"></div>
+    <div id="info">Tap an icon to see the shortest walking route.</div>
+  </div>
+  <script src="lib/leaflet.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>
