@@ -19,8 +19,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.action === "FETCH_SCHOOLS") {
-    handleFetchSchools(request.gnafId).then(sendResponse);
+    if (request.action === "FETCH_NEARBY") {
+    handleFetchNearby(request.gnafId).then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "FETCH_NEGATIVE_GEARING") {
+    handleFetchNegativeGearing(request.gnafId).then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "FETCH_CMA") {
+    handleFetchCma(request.gnafId).then(sendResponse);
     return true;
   }
 });
@@ -52,7 +62,7 @@ async function handleFetchPropertySummary(rawAddress) {
         error: true,
         step: "GEOCODE_API_FAIL",
         status: geoRes.status,
-        message: `Lỗi Geocode (${geoRes.status}): ${errText || 'Key sai hoặc hết hạn authorization'}`
+        message: `Geocode error (${geoRes.status}): ${errText || 'Invalid or expired API key'}`
       };
     }
 
@@ -67,7 +77,7 @@ async function handleFetchPropertySummary(rawAddress) {
       return {
         error: true,
         step: "GEOCODE_NO_MATCH",
-        message: `API Geocode không tìm thấy dữ liệu cho: "${rawAddress}"`
+        message: `The geocode API found no match for: "${rawAddress}"`
       };
     }
 
@@ -81,7 +91,7 @@ async function handleFetchPropertySummary(rawAddress) {
       return {
         error: true,
         step: "GEOCODE_NO_ID",
-        message: `Địa chỉ "${matchedAddress}" không có mã GNAF ID hợp lệ.`
+        message: `The address "${matchedAddress}" has no valid GNAF ID.`
       };
     }
 
@@ -90,7 +100,7 @@ async function handleFetchPropertySummary(rawAddress) {
   } catch (err) {
     console.error("💥 BƯỚC 1 LỖI MẠNG / SCRIPT:", err);
     console.groupEnd();
-    return { error: true, step: "GEOCODE_NETWORK_ERROR", message: `Lỗi kết nối Geocode: ${err.message}` };
+    return { error: true, step: "GEOCODE_NETWORK_ERROR", message: `Geocode connection error: ${err.message}` };
   }
 
   // BƯỚC 2A: GỌI API ĐỊNH GIÁ AVM
@@ -110,7 +120,7 @@ async function handleFetchPropertySummary(rawAddress) {
         error: true,
         step: "AVM_API_FAIL",
         status: avmRes.status,
-        message: `Lỗi API AVM (${avmRes.status}): ${errText || 'Không lấy được định giá'}`
+        message: `AVM API error (${avmRes.status}): ${errText || 'Could not retrieve a valuation'}`
       };
     }
 
@@ -125,13 +135,13 @@ async function handleFetchPropertySummary(rawAddress) {
       return {
         error: true,
         step: "AVM_NO_PRICE",
-        message: "Không tìm thấy dữ liệu giá định giá cho tài sản này."
+        message: "No valuation is available for this property."
       };
     }
   } catch (err) {
     console.error("💥 BƯỚC 2A LỖI MẠNG / SCRIPT AVM:", err);
     console.groupEnd();
-    return { error: true, step: "AVM_NETWORK_ERROR", message: `Lỗi kết nối AVM: ${err.message}` };
+    return { error: true, step: "AVM_NETWORK_ERROR", message: `AVM connection error: ${err.message}` };
   }
 
   // BƯỚC 2B: GỌI API THÔNG TIN CƠ BẢN (BASICS)
@@ -151,7 +161,7 @@ async function handleFetchPropertySummary(rawAddress) {
         error: true,
         step: "BASICS_API_FAIL",
         status: basicsRes.status,
-        message: `Lỗi API Basics (${basicsRes.status}): ${errText || 'Không lấy được thông tin cơ bản'}`
+        message: `Basics API error (${basicsRes.status}): ${errText || 'Could not retrieve basic property details'}`
       };
     }
 
@@ -163,7 +173,7 @@ async function handleFetchPropertySummary(rawAddress) {
   } catch (err) {
     console.error("💥 BƯỚC 2B LỖI MẠNG BASICS:", err);
     console.groupEnd();
-    return { error: true, step: "BASICS_NETWORK_ERROR", message: `Lỗi kết nối Basics: ${err.message}` };
+    return { error: true, step: "BASICS_NETWORK_ERROR", message: `Basics connection error: ${err.message}` };
   }
 
   // BƯỚC 3: ĐÓNG GÓI DỮ LIỆU THÀNH CÔNG TRẢ VỀ CONTENT.JS
@@ -249,70 +259,7 @@ async function handleFetchByGnafDirectly(gnafId) {
   return {
     error: false,
     gnafId: gnafId,
-    matchedAddress: `Mã GNAF: ${gnafId}`,
-
-    avmEstimate: resAvm.predicted_price ? Math.round(resAvm.predicted_price) : null,
-    avmLow: resAvm.predicted_price_low ? Math.round(resAvm.predicted_price_low) : null,
-    avmHigh: resAvm.predicted_price_high ? Math.round(resAvm.predicted_price_high) : null,
-    confidenceScore: resAvm.confidence_score || null,
-
-    bedCount: resBasics.bed_count ?? null,
-    bathCount: resBasics.bath_count ?? null,
-    parkingCount: resBasics.parking_count ?? null,
-    dwellingType: resBasics.dwelling_type || null,
-    landAreaSqm: resBasics.land_area_sqm || null
-  };
-}
-
-// ==========================================
-// 3. HÀM MỚI BỔ SUNG: GỌI TRỰC TIẾP BẰNG GNAF ID (BỎ QUA GEOCODE)
-// ==========================================
-
-async function handleFetchByGnafDirectly(gnafId) {
-  console.group("🚀 [Microburbs Direct GNAF Debug]");
-  console.log("📌 Gọi trực tiếp dữ liệu cho GNAF ID:", gnafId);
-
-  const headers = { "Authorization": `Bearer ${API_KEY}` };
-
-  // 1. Gọi AVM
-  let resAvm = {};
-  try {
-    const avmUrl = `${API_BASE}/properties/${gnafId}/valuation/avm`;
-    const avmRes = await fetch(avmUrl, { headers });
-    if (avmRes.ok) {
-      const avmData = await avmRes.json();
-      resAvm = avmData.data || avmData;
-    } else {
-      const errText = await avmRes.text();
-      console.error("❌ Lỗi AVM Direct:", avmRes.status, errText);
-    }
-  } catch (err) {
-    console.error("💥 Lỗi Mạng AVM Direct:", err);
-  }
-
-  // 2. Gọi Basics
-  let resBasics = {};
-  try {
-    const basicsUrl = `${API_BASE}/properties/${gnafId}/basics/all`;
-    const basicsRes = await fetch(basicsUrl, { headers });
-    if (basicsRes.ok) {
-      const basicsData = await basicsRes.json();
-      resBasics = basicsData.data || basicsData;
-    } else {
-      const errText = await basicsRes.text();
-      console.error("❌ Lỗi Basics Direct:", basicsRes.status, errText);
-    }
-  } catch (err) {
-    console.error("💥 Lỗi Mạng Basics Direct:", err);
-  }
-
-  console.groupEnd();
-
-  // Đóng gói trả về cho content.js
-  return {
-    error: false,
-    gnafId: gnafId,
-    matchedAddress: `Mã GNAF: ${gnafId}`,
+    matchedAddress: `GNAF ID ${gnafId}`,
 
     avmEstimate: resAvm.predicted_price ? Math.round(resAvm.predicted_price) : null,
     avmLow: resAvm.predicted_price_low ? Math.round(resAvm.predicted_price_low) : null,
@@ -330,55 +277,113 @@ async function handleFetchByGnafDirectly(gnafId) {
 // ==========================================
 // 3. TRIGGER TAB TRƯỜNG HỌC
 // ==========================================
-async function handleFetchSchools(gnafId) {
-  try {
-    const schoolUrl = `${API_BASE}/properties/${gnafId}/schools/all`;
-    console.log("🌐 Đang gọi API School ->", schoolUrl);
+async function fetchJson(url) {
+  console.log("🌐 Đang gọi ->", url);
+  const res = await fetch(url, { headers: { "Authorization": `Bearer ${API_KEY}` } });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`HTTP ${res.status}: ${errText}`);
+  }
+  const json = await res.json();
+  return json.data || json;
+}
 
-    const schoolRes = await fetch(schoolUrl, { headers: { "Authorization": `Bearer ${API_KEY}` } });
-    console.log("📡 Status Code School:", schoolRes.status);
+const NEARBY_RADIUS_M = 2000; // 100 - 5000, mặc định API là 1000
 
-    if (!schoolRes.ok) {
-      const errText = await schoolRes.text();
-      console.error("❌ LỖI HTTP SCHOOLS:", schoolRes.status, errText);
-      return {
-        error: true,
-        step: "SCHOOLS_API_FAIL",
-        status: schoolRes.status,
-        message: `Lỗi API Trường học (${schoolRes.status}): ${errText}`
-      };
-    }
+async function handleFetchNearby(gnafId) {
+  const [schoolRes, amenRes, transRes] = await Promise.allSettled([
+    fetchJson(`${API_BASE}/properties/${gnafId}/schools/all`),
+    fetchJson(`${API_BASE}/properties/${gnafId}/amenities/nearby?radius_m=${NEARBY_RADIUS_M}`),
+    fetchJson(`${API_BASE}/properties/${gnafId}/transport/nearby?radius_m=${NEARBY_RADIUS_M}`)
+  ]);
 
-    const schoolData = await schoolRes.json();
-    console.log("📦 Response Payload Trường học:", schoolData);
+  const log = (name, r) =>
+    r.status === "fulfilled"
+      ? console.log(`📦 ${name} payload:`, r.value)
+      : console.error(`❌ ${name} lỗi:`, r.reason);
+  log("Schools", schoolRes);
+  log("Amenities", amenRes);
+  log("Transport", transRes);
 
-    const resSchools = schoolData.data || schoolData;
-
-    if (!resSchools.ranking && !resSchools.nearby) {
-      console.warn("⚠️ Không tìm thấy trường học nào xung quanh!");
-      return {
-        error: true,
-        step: "SCHOOLS_EMPTY",
-        message: "Không có dữ liệu trường học xung quanh địa chỉ này."
-      };
-    }
-
-    console.log("✅ BƯỚC SCHOOLS THÀNH CÔNG!");
-
+  if ([schoolRes, amenRes, transRes].every(r => r.status === "rejected")) {
     return {
-      error: false,
-      gnafId: gnafId,
-      ranking: resSchools.ranking || [],
-      nearby: resSchools.nearby || [],
-      schools: resSchools.ranking || resSchools.nearby || []
+      error: true,
+      step: "NEARBY_API_FAIL",
+      message: `API error: ${schoolRes.reason.message}`
     };
+  }
 
+  // --- Trường học: ranking có đủ thông tin, nearby bổ sung những trường chưa có xếp hạng ---
+  let schools = [];
+  if (schoolRes.status === "fulfilled") {
+    const ranking = schoolRes.value.ranking || [];
+    const nearby = schoolRes.value.nearby || [];
+    const seen = new Set(ranking.map(s => s.name));
+    schools = [...ranking, ...nearby.filter(s => !seen.has(s.name))]
+      .sort((a, b) => (a.distance_m ?? 1e9) - (b.distance_m ?? 1e9));
+  }
+
+  // --- Tiện ích ---
+  const amen = amenRes.status === "fulfilled" ? amenRes.value : null;
+  const transport = transRes.status === "fulfilled" ? transRes.value : null;
+
+  const center = amen && amen.center_lat != null
+  ? { lat: amen.center_lat, lng: amen.center_lng }
+  : (transport && transport.center_lat != null
+      ? { lat: transport.center_lat, lng: transport.center_lng }
+      : null);
+
+  return {
+    error: false,
+    gnafId,
+    center,
+    schools,
+    amenities: amen && {
+      radius: amen.radius_m,
+      counts: amen.counts || {},
+      results: amen.results || []
+    },
+    transport: transport && {
+      radius: transport.radius_m,
+      counts: transport.counts || {},
+      nearest: transport.nearest || {}
+    }
+  };
+}
+
+// ==========================================
+// 4. NEGATIVE GEARING (tính phí 20c/lần gọi -> chỉ gọi khi người dùng mở tab Investment)
+// ==========================================
+async function handleFetchNegativeGearing(gnafId) {
+  try {
+    const data = await fetchJson(`${API_BASE}/properties/${gnafId}/valuation/negative-gearing`);
+    console.log("📦 Negative gearing payload:", data);
+    return { error: false, gnafId, data };
   } catch (err) {
-    console.error("💥 LỖI MẠNG SCHOOLS:", err);
-    return { 
-      error: true, 
-      step: "SCHOOLS_NETWORK_ERROR", 
-      message: `Lỗi kết nối API Trường học: ${err.message}` 
+    console.error("❌ Lỗi Negative gearing:", err);
+    return {
+      error: true,
+      step: "NEGATIVE_GEARING_FAIL",
+      message: `Negative gearing API error: ${err.message}`
+    };
+  }
+}
+
+
+// ==========================================
+// 5. CMA COMPARABLE SET (tính phí 60c/lần gọi -> chỉ gọi khi người dùng mở tab Comparables)
+// ==========================================
+async function handleFetchCma(gnafId) {
+  try {
+    const data = await fetchJson(`${API_BASE}/properties/${gnafId}/comparables/cma-comp-set`);
+    console.log("📦 CMA comp set payload:", data);
+    return { error: false, gnafId, data };
+  } catch (err) {
+    console.error("❌ Lỗi CMA:", err);
+    return {
+      error: true,
+      step: "CMA_FAIL",
+      message: `Comparable sales API error: ${err.message}`
     };
   }
 }
