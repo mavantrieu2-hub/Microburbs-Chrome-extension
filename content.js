@@ -834,6 +834,5 @@
   });
 
 })();
-  });
 
 })(); // <--- ĐẶT NGAY TRƯỚC DÒNG ĐÓNG KHỐI IIFE NÀY
