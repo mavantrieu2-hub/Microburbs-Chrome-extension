@@ -1,0 +1,33 @@
+{
+    "manifest_version": 3,
+    "name": "Microburbs Smart Buyer Sidebar",
+    "version": "1.0",
+    "description": "Hiển thị thông tin định giá AVM và tiện ích khu vực trực tiếp trên trang bất động sản.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://*.domain.com.au/*",
+        "https://*.realestate.com.au/*",
+        "https://api.microburbs.com.au/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://*.domain.com.au/*",
+                "https://*.realestate.com.au/*"
+            ],
+            "js": ["content.js"],
+            "css": ["styles.css"]
+        }
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Microburbs Buyer Assistant"
+    }
+}
