@@ -316,7 +316,10 @@
     if (data.confidenceScore) {
       rows.push(factRow('Confidence', `${esc(data.confidenceScore)}%`, 'Model confidence in the estimate'));
     }
-    if (data.dwellingType) rows.push(factRow('Dwelling type', esc(data.dwellingType)));
+    const badValues = ['nan', 'none', 'null', 'undefined', ''];
+    if (data.dwellingType && !badValues.includes(String(data.dwellingType).trim().toLowerCase())) {
+      rows.push(factRow('Dwelling type', esc(data.dwellingType)));
+    }
     if (data.landAreaSqm) rows.push(factRow('Land area', `${esc(data.landAreaSqm)} m²`));
 
     const parking = data.parkingCount;
