@@ -8,51 +8,53 @@ const API_KEY = "ht26_NtKrD0IoIZ5BhRXyGounbvHp";
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("📩 [background.js] Nhận yêu cầu Action:", request.action);
 
-  const safeSend = (promise) => {
-    promise
+  // Nhận 1 hàm (không phải promise) để lỗi đồng bộ cũng bị bắt, luôn có phản hồi về content.js
+  const safeSend = (fn) => {
+    Promise.resolve()
+      .then(fn)
       .then(sendResponse)
       .catch((err) => {
         console.error("💥 Lỗi Uncaught trong Background Router:", err);
         sendResponse({
           error: true,
           step: "BACKGROUND_CRASH",
-          message: err.message || "Lỗi không xác định ở Service Worker"
+          message: err.message || "Unknown error in the background service"
         });
       });
   };
 
   if (request.action === "FETCH_PROPERTY_SUMMARY") {
-    safeSend(handleFetchPropertySummary(request.address));
+    safeSend(() => handleFetchPropertySummary(request.address));
     return true; 
   }
 
   if (request.action === "FETCH_PROPERTY_BY_GNAF") {
-    safeSend(handleFetchByGnafDirectly(request.gnafId));
+    safeSend(() => handleFetchByGnafDirectly(request.gnafId));
     return true;
   }
 
   if (request.action === "FETCH_NEARBY") {
-    safeSend(handleFetchNearby(request.gnafId));
+    safeSend(() => handleFetchNearby(request.gnafId));
     return true;
   }
 
   if (request.action === "FETCH_NEGATIVE_GEARING") {
-    safeSend(handleFetchNegativeGearing(request.gnafId));
+    safeSend(() => handleFetchNegativeGearing(request.gnafId));
     return true;
   }
 
   if (request.action === "FETCH_CMA") {
-    safeSend(handleFetchCma(request.gnafId));
+    safeSend(() => handleFetchCma(request.gnafId));
     return true;
   }
 
   if (request.action === "FETCH_RENT_LATEST") {
-    safeSend(handleFetchRentLatest(request.gnafId));
+    safeSend(() => handleFetchRentLatest(request.gnafId));
     return true;
   }
 
   if (request.action === "FETCH_RISKS") {
-    safeSend(handleFetchRisks(request.gnafId));
+    safeSend(() => handleFetchRisks(request.gnafId));
     return true;
   }
 });
@@ -99,7 +101,7 @@ async function handleFetchPropertySummary(rawAddress) {
       return {
         error: true,
         step: "GEOCODE_NO_MATCH",
-        message: `Không tìm thấy địa chỉ khớp cho: "${rawAddress}"`
+        message: `No matching address found for: "${rawAddress}"`
       };
     }
 
@@ -113,7 +115,7 @@ async function handleFetchPropertySummary(rawAddress) {
       return {
         error: true,
         step: "GEOCODE_NO_ID",
-        message: `Địa chỉ "${matchedAddress}" không có mã GNAF ID hợp lệ.`
+        message: `The address "${matchedAddress}" has no valid GNAF ID.`
       };
     }
 
@@ -122,7 +124,7 @@ async function handleFetchPropertySummary(rawAddress) {
   } catch (err) {
     console.error("💥 BƯỚC 1 LỖI MẠNG / SCRIPT:", err);
     console.groupEnd();
-    return { error: true, step: "GEOCODE_NETWORK_ERROR", message: `Lỗi kết nối Geocode: ${err.message}` };
+    return { error: true, step: "GEOCODE_NETWORK_ERROR", message: `Geocode connection error: ${err.message}` };
   }
 
   // BƯỚC 2A: GỌI API ĐỊNH GIÁ AVM
@@ -253,7 +255,6 @@ async function handleFetchByGnafDirectly(gnafId) {
     landAreaSqm: resBasics.land_area_sqm || null
   };
 }
-
 // ==========================================
 // 4. TRIGGER TAB TRƯỜNG HỌC & TIỆN ÍCH
 // ==========================================
@@ -284,7 +285,7 @@ async function handleFetchNearby(gnafId) {
     return {
       error: true,
       step: "NEARBY_API_FAIL",
-      message: `API error: ${schoolRes.reason?.message || 'Không có dữ liệu tiện ích'}`
+      message: `API error: ${schoolRes.reason?.message || 'No nearby data available'}`
     };
   }
 
