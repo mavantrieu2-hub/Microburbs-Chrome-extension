@@ -446,3 +446,107 @@
   color: #8a5a00;
   line-height: 1.4;
 }
+
+/* ---- Tab Comparables: bố cục gọn ---- */
+.mb-comp-row {
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background .12s;
+}
+.mb-comp-row:hover { background: #f1f6fc; }
+.mb-comp-row:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.mb-comp-row.selected { background: #e3eefa; box-shadow: inset 3px 0 0 #17497a; }
+.mb-comp-row .mb-fact { padding: 6px 6px; }
+.mb-comp-row .mb-fact-value { font-size: 13px; }
+.mb-comp-row .mb-fact-label { font-weight: 600; }
+
+.mb-comps-scroll { max-height: 230px; overflow-y: auto; }
+#mb-comps-list.mb-compact { margin-bottom: 0; }
+#mb-comps-list .mb-facts { margin-bottom: 0; }
+
+/* Thẻ chi tiết 1 căn (dưới bản đồ) */
+.mb-sel {
+  background: #ffffff;
+  border: 1px solid #c4d6ea;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.mb-sel-empty {
+  font-size: 12px;
+  color: #6b7f94;
+  text-align: center;
+  background: #f8fafc;
+}
+.mb-sel-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.mb-sel-main { min-width: 0; }
+.mb-sel-addr { font-size: 13px; font-weight: 800; color: #123b64; line-height: 1.3; }
+.mb-sel-sub { font-size: 10.5px; color: #6b7f94; margin-top: 2px; }
+.mb-sel-price { font-size: 18px; font-weight: 800; color: #123b64; white-space: nowrap; }
+
+.mb-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.mb-chip {
+  background: #eef4fb;
+  border: 1px solid #d5e2f0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #17497a;
+}
+
+.mb-sel-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.mb-sel-stat { background: #f8fafc; border-radius: 6px; padding: 5px 7px; text-align: center; }
+.mb-sel-stat-label { font-size: 9.5px; font-weight: 700; color: #6b7f94; text-transform: uppercase; letter-spacing: .3px; }
+.mb-sel-stat-val { font-size: 13px; font-weight: 800; color: #123b64; margin-top: 1px; }
+
+.mb-sel .mb-more summary { font-size: 11px; padding: 6px 0 2px; }
+.mb-sel-extra { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #3d5670; padding: 3px 0; border-bottom: 1px solid #eef2f7; }
+.mb-sel-extra strong { color: #123b64; text-align: right; overflow-wrap: anywhere; }
+
+/* ---- Tab Risks ---- */
+.mb-risk-banner { border: 1px solid; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+.mb-risk-banner.high { background: #fef3f2; border-color: #fda29b; color: #7a271a; }
+.mb-risk-banner.mid  { background: #fff6e5; border-color: #f5d28a; color: #8a5a00; }
+.mb-risk-banner.low  { background: #ecfdf3; border-color: #a6f4c5; color: #05603a; }
+.mb-risk-banner-title { font-size: 14px; font-weight: 800; }
+.mb-risk-banner-sub { font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+.mb-risk-banner .mb-chips { margin-top: 8px; }
+
+.mb-risk-caption { font-size: 10.5px; color: #6b7f94; padding: 6px 0 0; }
+.mb-risk-row {
+  display: grid;
+  grid-template-columns: 112px 1fr 84px;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3ebf4;
+}
+.mb-risk-name { font-size: 12px; font-weight: 600; color: #3d5670; }
+.mb-risk-track { position: relative; height: 6px; margin: 0 6px; background: #e8eef5; border-radius: 999px; }
+.mb-risk-fill { position: absolute; left: 0; top: 0; bottom: 0; background: #c4d6ea; border-radius: 999px; }
+.mb-risk-dot {
+  position: absolute; top: 50%; width: 12px; height: 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%; border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .25);
+  background: #067647;
+}
+.mb-risk-val { font-size: 12px; font-weight: 800; text-align: right; color: #123b64; }
+.mb-risk-note { grid-column: 1 / -1; font-size: 10.5px; color: #6b7f94; }
+
+.mb-risk-alert .mb-risk-dot { background: #b42318; }
+.mb-risk-alert .mb-risk-val { color: #b42318; }
+.mb-risk-warn .mb-risk-dot { background: #dc6803; }
+.mb-risk-warn .mb-risk-val { color: #b54708; }
+.mb-risk-near .mb-risk-dot { background: #f79009; }
+.mb-risk-near .mb-risk-val { color: #b54708; }
+.mb-risk-info .mb-risk-dot { background: #2563eb; }
+.mb-risk-info .mb-risk-val { color: #1d4ed8; }
+
+.mb-risk-todo { display: flex; gap: 8px; padding: 7px 0; font-size: 12px; color: #3d5670; line-height: 1.4; border-bottom: 1px solid #e3ebf4; }
