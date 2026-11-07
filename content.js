@@ -10,6 +10,8 @@
   let nearbyCache = { gnafId: null, promise: null }; // Cache dữ liệu tiện ích (dùng chung cho 2 tab)
   let gearingCache = { gnafId: null, promise: null }; // Cache negative gearing (API tính phí 20c/lần)
   let compsCache = { gnafId: null, promise: null };   // Cache CMA comparables (API tính phí 60c/lần)
+  let rentCache = { gnafId: null, promise: null };    // Cache rent-history-latest
+  let riskCache = { gnafId: null, promise: null };    // Cache risks/all
   let activeTab = 'summary';   // Tab đang mở: summary | nearby
 
   // =========================================================================
@@ -108,6 +110,7 @@
         <button id="mb-tab-nearby" class="mb-tab-btn">Details</button>
         <button id="mb-tab-invest" class="mb-tab-btn">Investment</button>
         <button id="mb-tab-comps" class="mb-tab-btn">Comparables</button>
+        <button id="mb-tab-risks" class="mb-tab-btn">Risks</button>
       </div>
 
       <div id="mb-content-body" class="mb-body">
@@ -128,6 +131,7 @@
     document.getElementById('mb-tab-nearby').onclick = () => switchTab('nearby');
     document.getElementById('mb-tab-invest').onclick = () => switchTab('invest');
     document.getElementById('mb-tab-comps').onclick = () => switchTab('comps');
+    document.getElementById('mb-tab-risks').onclick = () => switchTab('risks');
 
     return sidebar;
   }
@@ -192,7 +196,7 @@
   // ---------- Quản lý tab ----------
   function setActiveTab(tabName) {
     activeTab = tabName;
-    ['summary', 'nearby', 'invest', 'comps'].forEach(t => {
+    ['summary', 'nearby', 'invest', 'comps', 'risks'].forEach(t => {
       const btn = document.getElementById(`mb-tab-${t}`);
       if (btn) btn.classList.toggle('active', t === tabName);
     });
@@ -237,9 +241,9 @@
     if (tabName === 'invest') {
       body.innerHTML = `<div class="mb-spinner">💰 Loading investment figures…</div>`;
       const gearingId = currentGnafId;
-      loadGearing(gearingId).then((response) => {
+      Promise.all([loadGearing(gearingId), loadRent(gearingId)]).then(([response, rentRes]) => {
         if (gearingId !== currentGnafId || activeTab !== 'invest') return; // đã đổi nhà / đổi tab
-        renderInvestmentData(response);
+        renderInvestmentData(response, rentRes);
       });
       return;
     }
@@ -251,6 +255,16 @@
       Promise.all([loadComps(compsId), loadNearby(compsId)]).then(([res, nearby]) => {
         if (compsId !== currentGnafId || activeTab !== 'comps') return; // đã đổi nhà / đổi tab
         renderCompsData(res, nearby);
+      });
+      return;
+    }
+
+    if (tabName === 'risks') {
+      body.innerHTML = `<div class="mb-spinner">🛡️ Loading risk overlays…</div>`;
+      const riskId = currentGnafId;
+      loadRisks(riskId).then((response) => {
+        if (riskId !== currentGnafId || activeTab !== 'risks') return; // đã đổi nhà / đổi tab
+        renderRisksData(response);
       });
       return;
     }
@@ -574,7 +588,45 @@
     return promise;
   }
 
-  function renderInvestmentData(res) {
+  function loadRent(gnafId) {
+    if (rentCache.gnafId === gnafId && rentCache.promise) return rentCache.promise;
+
+    const promise = new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "FETCH_RENT_LATEST", gnafId }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ error: true, message: chrome.runtime.lastError.message });
+        } else {
+          resolve(response || { error: true, message: 'No response from the background service.' });
+        }
+      });
+    });
+
+    rentCache = { gnafId, promise };
+    promise.then(r => {
+      if (r && r.error && rentCache.promise === promise) rentCache = { gnafId: null, promise: null };
+    });
+    return promise;
+  }
+
+  // Schema rent-history-latest chưa rõ -> dò các tên trường phổ biến, không có thì hiện các trường đơn giản
+  const RENT_KEYS = ['rent_pw', 'weekly_rent', 'rent_per_week', 'rent_weekly', 'rent', 'price', 'amount'];
+  const RENT_DATE_KEYS = ['date', 'date_listed', 'listing_date', 'observed_date', 'rent_date', 'date_observed', 'last_seen_date', 'last_seen'];
+
+  function parseRent(rentRes) {
+    if (!rentRes || rentRes.error || !rentRes.data) return null;
+    let d = rentRes.data;
+    if (Array.isArray(d)) d = d[0];
+    if (!d || typeof d !== 'object') return null;
+    const num = (v) => {
+      const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.]/g, ''));
+      return isFinite(n) && n > 0 ? n : null;
+    };
+    const key = RENT_KEYS.find(k => num(d[k]) != null);
+    const dkey = RENT_DATE_KEYS.find(k => d[k]);
+    return { raw: d, weekly: key ? num(d[key]) : null, date: dkey ? d[dkey] : null };
+  }
+
+  function renderInvestmentData(res, rentRes) {
     const body = document.getElementById('mb-content-body');
 
     if (!res || res.error) {
@@ -606,6 +658,26 @@
         'Loan-to-value ratio used in the main scenario')
     ];
     if (g.level) summaryRows.push(factRow('Calculated at', esc(String(g.level).replace(/_/g, ' ')), 'Level of detail used for this result'));
+
+    // Tiền thuê ghi nhận gần nhất + tỷ suất trên giá ước tính
+    const rent = parseRent(rentRes);
+    const avmV = window.cachedSummaryData?.avmEstimate;
+    if (rent && rent.weekly) {
+      summaryRows.push(factRow('Latest rent seen', `$${Math.round(rent.weekly).toLocaleString('en-AU')}/wk`,
+        rent.date ? `Observed ${esc(fmtDate(rent.date))}` : 'Most recent rent observation'));
+      if (avmV) {
+        summaryRows.push(factRow('Yield on estimate', `${(rent.weekly * 52 / avmV * 100).toFixed(2)}%`,
+          'Annual rent ÷ estimated value (assumes the rent is per week)'));
+      }
+    } else if (rent) {
+      Object.entries(rent.raw)
+        .filter(([k, v]) => v != null && v !== '' && typeof v !== 'object' && !/(^|_)p?id$/i.test(k))
+        .slice(0, 4)
+        .forEach(([k, v]) => summaryRows.push(factRow(esc(prettyCat(k)), esc(v))));
+    } else {
+      summaryRows.push(factRow('Latest rent seen', 'Not available',
+        esc(String(rentRes?.message || 'No rent observation for this property').slice(0, 120))));
+    }
 
     const cashRows = [
       factRow('At 80% LVR', signed(g.net_cashflow_80lvr), weekly),
@@ -644,8 +716,35 @@
     return promise;
   }
 
-  const COMPS_PREVIEW = 6;
   const titleCase = (t) => String(t ?? '').toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+
+  // Các trường đã hiển thị riêng; phần còn lại của bản ghi CMA nằm trong mục "More fields" (thu gọn)
+  const COMP_KNOWN_KEYS = new Set([
+    'street', 'sal', 'price', 'date_sold', 'bedrooms', 'bathrooms',
+    'garage_spaces', 'property_type', 'latitude', 'longitude'
+  ]);
+
+  let compsMsgHandler = null; // listener nhận tin nhắn từ iframe bản đồ (chỉ giữ 1 cái)
+
+  // $1.25M / $850k — gọn để làm nhãn trên bản đồ
+  const shortMoney = (v) => {
+    if (!(typeof v === 'number' && isFinite(v) && v > 0)) return 'N/A';
+    return v >= 1e6 ? `$${(v / 1e6).toFixed(2).replace(/\.?0+$/, '')}M` : `$${Math.round(v / 1000)}k`;
+  };
+
+  const fmtShortDate = (v) => {
+    const d = new Date(v);
+    return isNaN(d) ? String(v) : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  // "25 days ago" / "8 mo ago" / "2 yr ago"
+  const agoText = (ts) => {
+    if (isNaN(ts)) return '';
+    const days = Math.max(0, Math.round((Date.now() - ts) / 86400000));
+    if (days < 60) return `${days} day${days === 1 ? '' : 's'} ago`;
+    if (days < 730) return `${Math.round(days / 30)} mo ago`;
+    return `${Math.round(days / 365)} yr ago`;
+  };
 
   function renderCompsData(res, nearby) {
     const body = document.getElementById('mb-content-body');
@@ -663,67 +762,358 @@
     }
 
     const center = nearby && !nearby.error ? nearby.center : null;
+    const subj = window.cachedSummaryData || {};
+    const avm = subj.avmEstimate;
     const money = (v) => (typeof v === 'number' && isFinite(v) && v > 0)
       ? `$${Math.round(v).toLocaleString('en-AU')}` : 'Not available';
 
-    const sales = list.map(c => ({
-      street: c.street, suburb: c.sal,
-      price: c.price != null ? Number(c.price) : NaN,
-      date: c.date_sold, ts: Date.parse(c.date_sold),
-      beds: c.bedrooms, baths: c.bathrooms, cars: c.garage_spaces, type: c.property_type,
-      dist: (center && c.latitude != null && c.longitude != null)
-        ? Math.round(getStraightDistanceMeters(center.lat, center.lng, c.latitude, c.longitude)) : null
-    }));
-    // Bán gần đây nhất lên đầu
-    sales.sort((a, b) => (isNaN(b.ts) ? -Infinity : b.ts) - (isNaN(a.ts) ? -Infinity : a.ts));
+    // id = vị trí trong danh sách gốc, dùng để nối marker <-> dòng danh sách <-> thẻ chi tiết
+    const sales = list.map((c, i) => {
+      const lat = c.latitude != null ? Number(c.latitude) : NaN;
+      const lng = c.longitude != null ? Number(c.longitude) : NaN;
+      const onMap = isFinite(lat) && isFinite(lng);
+      return {
+        id: i, raw: c,
+        street: c.street, suburb: c.sal,
+        price: c.price != null ? Number(c.price) : NaN,
+        date: c.date_sold, ts: Date.parse(c.date_sold),
+        beds: c.bedrooms, baths: c.bathrooms, cars: c.garage_spaces, type: c.property_type,
+        lat, lng, onMap,
+        dist: (center && onMap)
+          ? Math.round(getStraightDistanceMeters(center.lat, center.lng, lat, lng)) : null
+      };
+    });
+    const byId = new Map(sales.map(x => [x.id, x]));
+    sales.sort((a, b) => (isNaN(b.ts) ? -Infinity : b.ts) - (isNaN(a.ts) ? -Infinity : a.ts)); // mới nhất trước
 
     const prices = sales.map(x => x.price).filter(p => isFinite(p) && p > 0).sort((a, b) => a - b);
     const n = prices.length;
     const median = n ? (n % 2 ? prices[(n - 1) / 2] : (prices[n / 2 - 1] + prices[n / 2]) / 2) : null;
     const latest = sales.find(x => !isNaN(x.ts));
-    const avm = window.cachedSummaryData?.avmEstimate;
 
+    // ----- Tổng hợp: chỉ 4 dòng -----
     const summaryRows = [
-      factRow('Comparable sales', String(sales.length), 'Similar properties sold nearby'),
-      factRow('Price range', n ? `${money(prices[0])} – ${money(prices[n - 1])}` : 'Not available', 'Lowest to highest sale price'),
+      factRow('Sales found', String(sales.length), n ? `${money(prices[0])} – ${money(prices[n - 1])}` : ''),
       factRow('Median price', money(median), 'Middle sale price of the set')
     ];
-    if (latest) summaryRows.push(factRow('Most recent sale', esc(fmtDate(latest.date)), `${esc(titleCase(latest.street))}`));
     if (median && avm) {
       const pct = Math.round((avm / median - 1) * 100);
-      summaryRows.push(factRow('Estimate vs median', `${pct > 0 ? '+' : ''}${pct}%`, 'Estimated value compared with the median sale'));
+      summaryRows.push(factRow('Estimate vs median', `${pct > 0 ? '+' : ''}${pct}%`, 'This home’s estimate vs the median sale'));
     }
+    if (latest) summaryRows.push(factRow('Latest sale', esc(fmtShortDate(latest.date)), esc(titleCase(latest.street))));
 
-    const TWO_YEARS_MS = 2 * 365 * 24 * 3600 * 1000;
-    const saleRow = (x) => {
-      const feats = [
-        x.beds != null ? `${x.beds} bed` : null,
-        x.baths != null ? `${x.baths} bath` : null,
-        x.cars != null ? `${x.cars} car` : null
-      ].filter(Boolean).join(' · ');
-      const note = [
-        x.date ? `Sold ${esc(fmtDate(x.date))}` : null,
-        feats || null,
-        x.type ? esc(titleCase(x.type)) : null,
-        x.dist != null ? `${fmtDist(x.dist)} away` : null,
-        (!isNaN(x.ts) && Date.now() - x.ts > TWO_YEARS_MS) ? 'Over 2 years ago' : null
-      ].filter(Boolean).join(' · ');
-      const label = `🏠 ${esc(titleCase(x.street))}${x.suburb ? `, ${esc(x.suburb)}` : ''}`;
-      return factRow(label, money(x.price), note);
+    // ----- So sánh bố cục với căn đang xem -----
+    const layoutVs = (x) => {
+      const diffs = [];
+      let compared = 0;
+      [['bed', x.beds, subj.bedCount], ['bath', x.baths, subj.bathCount], ['car', x.cars, subj.parkingCount]]
+        .forEach(([k, a, b]) => {
+          if (a == null || b == null) return;
+          compared++;
+          const d = Number(a) - Number(b);
+          if (d !== 0) diffs.push(`${d > 0 ? '+' : '−'}${Math.abs(d)} ${k}`);
+        });
+      if (!compared) return null;
+      return diffs.length ? diffs.join(', ') : 'Same';
     };
 
-    const head = sales.slice(0, COMPS_PREVIEW).map(saleRow).join('');
-    const rest = sales.slice(COMPS_PREVIEW);
-    const salesHtml = head + (rest.length
-      ? `<details class="mb-more"><summary>Show ${rest.length} more sale${rest.length === 1 ? '' : 's'}</summary>${rest.map(saleRow).join('')}</details>`
-      : '');
+    // ----- Thẻ chi tiết gọn (cột trái, dưới bản đồ) -----
+    const chipsOf = (x) => [
+      x.beds != null ? `🛏️ ${x.beds}` : null,
+      x.baths != null ? `🚿 ${x.baths}` : null,
+      x.cars != null ? `🚗 ${x.cars}` : null,
+      x.type ? esc(titleCase(x.type)) : null
+    ].filter(Boolean).map(t => `<span class="mb-chip">${t}</span>`).join('');
+
+    const detailHtml = (x) => {
+      const diff = (avm && isFinite(x.price) && x.price > 0) ? Math.round((x.price / avm - 1) * 100) : null;
+      const layout = layoutVs(x);
+      const stat = (label, value) => `<div class="mb-sel-stat"><div class="mb-sel-stat-label">${label}</div><div class="mb-sel-stat-val">${value}</div></div>`;
+      const stats = [
+        diff != null ? stat('Vs estimate', `${diff > 0 ? '+' : ''}${diff}%`) : '',
+        x.dist != null ? stat('Distance', fmtDist(x.dist)) : '',
+        layout ? stat('Vs this home', esc(layout)) : ''
+      ].join('');
+
+      // Các trường còn lại (schema có thể đổi) — thu gọn, bỏ các trường id
+      const extras = Object.entries(x.raw)
+        .filter(([k, v]) => !COMP_KNOWN_KEYS.has(k) && !/(^|_)p?id$/i.test(k)
+          && v != null && v !== '' && typeof v !== 'object')
+        .map(([k, v]) => `<div class="mb-sel-extra"><span>${esc(prettyCat(k))}</span><strong>${esc(typeof v === 'number' ? v.toLocaleString('en-AU') : v)}</strong></div>`)
+        .join('');
+
+      return `
+        <div class="mb-sel">
+          <div class="mb-sel-top">
+            <div class="mb-sel-main">
+              <div class="mb-sel-addr">${esc(titleCase(x.street))}${x.suburb ? `, ${esc(x.suburb)}` : ''}</div>
+              <div class="mb-sel-sub">${x.date ? `Sold ${esc(fmtShortDate(x.date))}${agoText(x.ts) ? ` · ${agoText(x.ts)}` : ''}` : 'Sale date not available'}</div>
+            </div>
+            <div class="mb-sel-price">${money(x.price)}</div>
+          </div>
+          <div class="mb-chips">${chipsOf(x)}</div>
+          ${stats ? `<div class="mb-sel-stats">${stats}</div>` : ''}
+          ${extras ? `<details class="mb-more"><summary>More fields</summary>${extras}</details>` : ''}
+        </div>`;
+    };
+
+    const detailHint = `<div class="mb-sel mb-sel-empty">👆 Click a price tag on the map, or a sale in the list, for details.</div>`;
+
+    // ----- Danh sách gọn (cột phải, có thanh cuộn) -----
+    const saleRow = (x) => {
+      const note = [
+        x.date ? esc(fmtShortDate(x.date)) : null,
+        [x.beds != null ? `${x.beds}b` : null, x.baths != null ? `${x.baths}ba` : null, x.cars != null ? `${x.cars}c` : null].filter(Boolean).join(' ') || null,
+        x.dist != null ? fmtDist(x.dist) : null,
+        !x.onMap ? 'No map pin' : null
+      ].filter(Boolean).join(' · ');
+      const label = `${esc(titleCase(x.street))}`;
+      return `<div class="mb-comp-row" data-comp-id="${x.id}" role="button" tabindex="0">${factRow(label, money(x.price), note)}</div>`;
+    };
+    const salesHtml = `<div class="mb-comps-scroll">${sales.map(saleRow).join('')}</div>`;
+
+    // ----- Bản đồ: chỉ có nhà này + các căn CMA (không có tiện ích) -----
+    const points = sales.filter(x => x.onMap).map(x => ({
+      id: x.id, lat: x.lat, lng: x.lng,
+      label: shortMoney(x.price),
+      title: `${titleCase(x.street)}${x.suburb ? `, ${x.suburb}` : ''}`,
+      subtitle: [money(x.price) !== 'Not available' ? money(x.price) : null,
+                 x.date ? `sold ${fmtShortDate(x.date)}` : null].filter(Boolean).join(' · ')
+    }));
+
+    const mapHtml = points.length
+      ? `<iframe id="mb-comps-frame" class="mb-map-frame" src="${chrome.runtime.getURL('map.html')}"></iframe>
+         <div class="mb-pills"><span class="mb-pill">📍 ${points.length} of ${sales.length} on map</span></div>`
+      : `<div class="mb-map-empty">🗺️ These sales have no map coordinates.</div>`;
 
     body.innerHTML = `
-      <div class="mb-details-grid">
-        <div>${factBlock('SALES SUMMARY', summaryRows.join(''))}</div>
-        <div>${factBlock(`RECENT SALES (${sales.length})`, salesHtml)}</div>
+      <div class="mb-overview">
+        <div class="mb-overview-left">
+          <div class="mb-map-card">${mapHtml}</div>
+          <div id="mb-comp-detail">${detailHint}</div>
+        </div>
+        <div class="mb-overview-right">
+          ${factBlock('SALES SUMMARY', summaryRows.join(''))}
+          <div id="mb-comps-list" class="mb-compact">${factBlock(`SALES (${sales.length})`, salesHtml)}</div>
+        </div>
       </div>
       <div class="mb-footer-pill">Comparable sales are a guide only. They are not a formal valuation.</div>`;
+
+    // ----- Tương tác -----
+    const frame = document.getElementById('mb-comps-frame');
+
+    const selectComp = (id, fromMap = false) => {
+      const x = byId.get(id);
+      if (!x) return;
+
+      document.querySelectorAll('#mb-comps-list .mb-comp-row').forEach(r =>
+        r.classList.toggle('selected', Number(r.dataset.compId) === id));
+
+      const box = document.getElementById('mb-comp-detail');
+      if (box) box.innerHTML = detailHtml(x);
+
+      if (fromMap) {
+        const row = document.querySelector(`#mb-comps-list .mb-comp-row[data-comp-id="${id}"]`);
+        if (row) row.scrollIntoView({ block: 'nearest' });
+      } else if (frame && frame.dataset.ready === '1' && x.onMap) {
+        frame.contentWindow.postMessage({ type: 'MB_MAP_SELECT', id }, '*');
+      }
+    };
+
+    const listEl = document.getElementById('mb-comps-list');
+    listEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.mb-comp-row');
+      if (row) selectComp(Number(row.dataset.compId));
+    });
+    listEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.mb-comp-row');
+      if (row) { e.preventDefault(); selectComp(Number(row.dataset.compId)); }
+    });
+
+    if (compsMsgHandler) window.removeEventListener('message', compsMsgHandler);
+    compsMsgHandler = null;
+
+    if (frame) {
+      compsMsgHandler = (e) => {
+        if (e.source !== frame.contentWindow || !e.data) return;
+        if (e.data.type === 'MB_MAP_READY') {
+          frame.dataset.ready = '1';
+          frame.contentWindow.postMessage(
+            { type: 'MB_MAP_DATA', payload: { mode: 'comps', center, points } }, '*');
+        } else if (e.data.type === 'MB_COMP_SELECT') {
+          selectComp(e.data.id, true);
+        }
+      };
+      window.addEventListener('message', compsMsgHandler);
+    }
+  }
+
+  // =========================================================================
+  // TAB RISKS: lớp rủi ro / quy hoạch quanh căn nhà (risks/all)
+  // =========================================================================
+  function loadRisks(gnafId) {
+    if (riskCache.gnafId === gnafId && riskCache.promise) return riskCache.promise;
+
+    const promise = new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "FETCH_RISKS", gnafId }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ error: true, message: chrome.runtime.lastError.message });
+        } else {
+          resolve(response || { error: true, message: 'No response from the background service.' });
+        }
+      });
+    });
+
+    riskCache = { gnafId, promise };
+    promise.then(r => {
+      if (r && r.error && riskCache.promise === promise) riskCache = { gnafId: null, promise: null };
+    });
+    return promise;
+  }
+
+  // weight: high = ảnh hưởng bảo hiểm/an toàn, med = đáng lưu ý, info = chỉ để biết
+  const RISK_META = {
+    bushfire:          { icon: '🔥', label: 'Bushfire',          group: 'hazard', weight: 'high', hint: 'May affect insurance cost and building requirements.' },
+    flood:             { icon: '🌊', label: 'Flood',             group: 'hazard', weight: 'high', hint: 'Check flood insurance cover and ask the council for flood information.' },
+    landslide:         { icon: '⛰️', label: 'Landslide',         group: 'hazard', weight: 'high', hint: 'A geotechnical report may be worth considering.' },
+    historical_flood:  { icon: '🌧️', label: 'Historical flood',  group: 'hazard', weight: 'med',  hint: 'The area has flooded before. Ask about the flood history.' },
+    erosion:           { icon: '🪨', label: 'Erosion',           group: 'hazard', weight: 'med',  hint: 'Ask about ground stability and any building restrictions.' },
+    environment:       { icon: '🌿', label: 'Environmental',     group: 'hazard', weight: 'med',  hint: 'May limit clearing, building or renovation.' },
+    hv_power_line:     { icon: '⚡', label: 'HV power line',     group: 'area',   weight: 'med',  hint: 'High-voltage lines can affect noise, views and some buyers.' },
+    heritage:          { icon: '🏛️', label: 'Heritage',          group: 'area',   weight: 'info', hint: 'Renovation or demolition may need council approval.' },
+    mobile_black_spot: { icon: '📵', label: 'Mobile black spot', group: 'area',   weight: 'info', hint: 'Mobile coverage may be patchy. Check with your carrier.' },
+    public_housing:    { icon: '🏘️', label: 'Public housing',    group: 'area',   weight: 'info', hint: '' }
+  };
+  const fmtRadius = (m) => (m % 1000 === 0 ? `${m / 1000} km` : fmtDist(m));  // 1000 -> "1 km"
+  const RISK_NEAR_M = 250;                       // gần hơn mức này (không nằm trên nhà) vẫn được đánh dấu "near"
+  const RISK_ORDER = { alert: 0, warn: 1, near: 2, info: 3, ok: 4 };
+
+  // alert = trên nhà & nghiêm trọng | warn = trên nhà & đáng lưu ý | near = sát nhà | info = chỉ để biết | ok = không đáng ngại
+  function riskStatus(meta, e) {
+    if (e.on_property) return meta.weight === 'high' ? 'alert' : meta.weight === 'med' ? 'warn' : 'info';
+    const d = Number(e.nearest_distance_m);
+    if (meta.weight !== 'info' && isFinite(d) && d <= RISK_NEAR_M) return 'near';
+    return 'ok';
+  }
+
+  // Mỗi nhóm có thể có nhiều dòng: ưu tiên dòng "on property", không thì dòng gần nhất
+  function pickRiskEntry(arr) {
+    return arr.find(x => x.on_property) ||
+      [...arr].sort((a, b) => (a.nearest_distance_m ?? 1e9) - (b.nearest_distance_m ?? 1e9))[0];
+  }
+
+  function renderRisksData(res) {
+    const body = document.getElementById('mb-content-body');
+
+    if (!res || res.error) {
+      body.innerHTML = `<div class="mb-error-box">❌ ${esc(res?.message || 'Could not load risk data')}</div>`;
+      return;
+    }
+
+    const data = res.data && typeof res.data === 'object' ? res.data : {};
+    const items = [];
+    Object.entries(data).forEach(([key, arr]) => {
+      if (!Array.isArray(arr) || !arr.length) return;
+      const meta = RISK_META[key] || { icon: '📌', label: prettyCat(key), group: 'area', weight: 'info', hint: '' };
+      const e = key === 'public_housing' ? (arr.find(x => x.on_property) || arr[0]) : pickRiskEntry(arr);
+      items.push({ key, meta, e, arr, st: riskStatus(meta, e) });
+    });
+
+    if (!items.length) {
+      body.innerHTML = `<div class="mb-fact-empty">No risk layers were returned for this property.</div>`;
+      return;
+    }
+
+    const byStatus = (s) => items.filter(i => i.st === s);
+    const onProp = items.filter(i => i.st === 'alert' || i.st === 'warn');
+    const near = byStatus('near');
+    const info = byStatus('info');
+    const clear = byStatus('ok');
+    const names = (list) => list.map(i => esc(i.meta.label)).join(', ');
+
+    // ----- Banner tổng hợp -----
+    const level = byStatus('alert').length ? 'high' : (onProp.length || near.length) ? 'mid' : 'low';
+    const title = {
+      high: '⚠️ Check these before buying',
+      mid: '🟠 A few flags to check',
+      low: '✅ No mapped hazards on or near this property'
+    }[level];
+    const subParts = [];
+    if (onProp.length) subParts.push(`<strong>On property:</strong> ${names(onProp)}`);
+    if (near.length) subParts.push(`<strong>Within ${RISK_NEAR_M} m:</strong> ${names(near)}`);
+    if (info.length) subParts.push(`<strong>Also noted:</strong> ${names(info)}`);
+
+    const banner = `
+      <div class="mb-risk-banner ${level}">
+        <div class="mb-risk-banner-title">${title}</div>
+        ${subParts.length ? `<div class="mb-risk-banner-sub">${subParts.join('<br/>')}</div>` : ''}
+        <div class="mb-chips">
+          <span class="mb-chip">On property: ${onProp.length + info.filter(i => i.e.on_property).length}</span>
+          <span class="mb-chip">Within ${RISK_NEAR_M} m: ${near.length}</span>
+          <span class="mb-chip">Clear: ${clear.length}</span>
+        </div>
+      </div>`;
+
+    // ----- Dòng "thang khoảng cách": thanh dài = nguồn rủi ro càng xa -----
+    const ladderRow = (i) => {
+      const e = i.e;
+      const radius = Number(e.search_radius_m) || 1000;
+      const d = Number(e.nearest_distance_m);
+      const none = !e.on_property && (e.features_within_radius === 0 || !isFinite(d));
+      const pos = e.on_property ? 0 : (none ? 100 : Math.min(100, Math.max(0, d / radius * 100)));
+      const valueText = e.on_property ? 'On property' : (none ? `None in ${fmtRadius(radius)}` : fmtDist(d));
+      const count = e.features_within_radius;
+      const note = count != null && count > 0
+        ? `${plural(count, 'mapped area')} within ${fmtRadius(radius)}` : '';
+      return `
+        <div class="mb-risk-row mb-risk-${i.st}">
+          <div class="mb-risk-name">${i.meta.icon} ${esc(i.meta.label)}</div>
+          <div class="mb-risk-track"><span class="mb-risk-fill" style="width:${pos}%"></span><span class="mb-risk-dot" style="left:${pos}%"></span></div>
+          <div class="mb-risk-val">${esc(valueText)}</div>
+          ${note ? `<div class="mb-risk-note">${esc(note)}</div>` : ''}
+        </div>`;
+    };
+    const sortItems = (list) => [...list].sort((a, b) =>
+      (RISK_ORDER[a.st] - RISK_ORDER[b.st]) ||
+      ((a.e.nearest_distance_m ?? 1e9) - (b.e.nearest_distance_m ?? 1e9)));
+
+    const hazards = sortItems(items.filter(i => i.meta.group === 'hazard'));
+    const area = sortItems(items.filter(i => i.meta.group === 'area' && i.key !== 'public_housing'));
+    const caption = '<div class="mb-risk-caption">Bar length = distance to the nearest mapped area.</div>';
+
+    // ----- Public housing: tỷ lệ % chứ không phải khoảng cách -----
+    const phItem = items.find(i => i.key === 'public_housing');
+    let phRow = '';
+    if (phItem) {
+      const here = phItem.arr.find(x => x.on_property);
+      const other = phItem.arr.find(x => !x.on_property);
+      if (here || other) {
+        const main = here || other;
+        const noteBits = [
+          here ? 'Share of properties in this area' : `Nearest area, ${fmtDist(other.nearest_distance_m)} away`,
+          here && other ? `${esc(other.value)} in the nearest other area (${fmtDist(other.nearest_distance_m)})` : null
+        ].filter(Boolean).join(' · ');
+        phRow = factRow('🏘️ Public housing', esc(main.value ?? 'Not available'), noteBits);
+      }
+    }
+
+    // ----- Gợi ý cần kiểm tra (chỉ với lớp nằm trên nhà) -----
+    const todo = onProp.filter(i => i.meta.hint).map(i => `
+      <div class="mb-risk-todo"><span>${i.meta.icon}</span><div><strong>${esc(i.meta.label)}.</strong> ${esc(i.meta.hint)}</div></div>`).join('');
+
+    body.innerHTML = `
+      ${banner}
+      <div class="mb-details-grid">
+        <div>
+          ${factBlock('NATURAL HAZARDS', caption + (hazards.map(ladderRow).join('') || emptyLine('No hazard layers.')))}
+        </div>
+        <div>
+          ${factBlock('NEIGHBOURHOOD FACTORS', caption + ((area.map(ladderRow).join('') + phRow) || emptyLine('No data for this group.')))}
+        </div>
+      </div>
+      ${todo ? `<div class="mb-facts">${`<div class="mb-facts-title">WORTH CHECKING</div>`}${todo}</div>` : ''}
+      <div class="mb-footer-pill">Mapped overlays within ${fmtRadius(Number(items[0].e.search_radius_m) || 1000)}. Not a site inspection, insurance quote or legal advice.</div>`;
   }
 
   // =========================================================================
@@ -770,6 +1160,10 @@
 
     compsCache = { gnafId: null, promise: null };
 
+    rentCache = { gnafId: null, promise: null };
+
+    riskCache = { gnafId: null, promise: null };
+
     chrome.runtime.sendMessage(
       { action: "FETCH_PROPERTY_SUMMARY", address: address },
       (response) => {
@@ -810,6 +1204,10 @@
 
       compsCache = { gnafId: null, promise: null };
 
+      rentCache = { gnafId: null, promise: null };
+
+      riskCache = { gnafId: null, promise: null };
+
       // 3. Phân loại: Nếu là GNAF ID thì gọi trực tiếp, nếu là địa chỉ thì qua Geocode
       const isGnafId = /^G[A-Z0-9]+$/i.test(query) || query.length > 12;
 
@@ -834,5 +1232,3 @@
   });
 
 })();
-
-})(); // <--- ĐẶT NGAY TRƯỚC DÒNG ĐÓNG KHỐI IIFE NÀY
