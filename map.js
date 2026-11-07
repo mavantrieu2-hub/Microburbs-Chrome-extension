@@ -100,10 +100,46 @@
     bounds = null;
 
     map = L.map('map', { zoomControl: true });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
+    addTiles(0);
+  }
+
+  // Nguồn ảnh nền: thử lần lượt, tự chuyển sang nguồn kế tiếp nếu nguồn hiện tại không tải được
+  const TILE_SOURCES = [
+    {
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    },
+    {
+      url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles © Esri — Source: Esri, HERE, Garmin, OpenStreetMap contributors',
+      maxZoom: 19
+    },
+    {
+      url: 'https://tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+      attribution: '© OpenStreetMap France | © OpenStreetMap contributors',
+      maxZoom: 19
+    }
+  ];
+
+  function addTiles(index) {
+    const src = TILE_SOURCES[index];
+    const thisMap = map;
+    let loaded = 0, failed = 0, switched = false;
+
+    const layer = L.tileLayer(src.url, { maxZoom: src.maxZoom, attribution: src.attribution }).addTo(thisMap);
+
+    layer.on('tileload', () => { loaded++; });
+    layer.on('tileerror', () => {
+      failed++;
+      // Chưa tải được ô nào mà đã lỗi liên tiếp -> đổi nguồn
+      if (switched || loaded > 0 || failed < 3) return;
+      if (thisMap !== map || index + 1 >= TILE_SOURCES.length) return; // bản đồ đã bị vẽ lại / hết nguồn
+      switched = true;
+      console.warn('Tile source failed, switching to:', TILE_SOURCES[index + 1].url);
+      thisMap.removeLayer(layer);
+      addTiles(index + 1);
+    });
   }
 
   function watchResize() {
