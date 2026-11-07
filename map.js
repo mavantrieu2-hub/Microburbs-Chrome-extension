@@ -13,6 +13,10 @@
   const routeCache = new Map();
   const info = document.getElementById('info');
 
+  // Chế độ "comps": các căn đã bán (CMA)
+  let compMarkers = new Map();   // id -> { marker, point }
+  let activeCompId = null;
+
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const norm = (c) => String(c || '').toLowerCase().replace(/\s+/g, '_');
@@ -24,6 +28,16 @@
       html: `<div class="pin ${extraClass}">${emoji}</div>`,
       iconSize: [28, 28],
       iconAnchor: [14, 14]
+    });
+  }
+
+  // Nhãn giá cho căn đã bán
+  function priceIcon(label) {
+    return L.divIcon({
+      className: '',
+      html: `<div class="pin-price">${esc(label)}</div>`,
+      iconSize: [64, 24],
+      iconAnchor: [32, 12]
     });
   }
 
@@ -75,18 +89,36 @@
   let bounds = null;
   let ro = null;
 
-  function render(payload) {
-    const { center, radius, points } = payload;
+  // Khởi tạo map + tile, dùng chung cho cả 2 chế độ
+  function resetMap() {
     if (map) { map.remove(); map = null; }
     if (ro) { ro.disconnect(); ro = null; }
     routeLayer = null;   // reset lộ trình cũ
     activeEl = null;     // reset icon đang chọn
+    compMarkers = new Map();
+    activeCompId = null;
+    bounds = null;
 
     map = L.map('map', { zoomControl: true });
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap'
     }).addTo(map);
+  }
+
+  function watchResize() {
+    ro = new ResizeObserver(() => {
+      if (!map) return;
+      map.invalidateSize();
+      if (!routeLayer && bounds) map.fitBounds(bounds); // đừng reset nếu đang xem lộ trình
+    });
+    ro.observe(document.getElementById('map'));
+  }
+
+  // ---------- Chế độ tiện ích (như cũ) ----------
+  function renderAmenities(payload) {
+    const { center, radius, points } = payload;
+    resetMap();
 
     const c = [center.lat, center.lng];
     bounds = L.latLng(c).toBounds(radius * 2);
@@ -105,16 +137,82 @@
       ? `${points.length} place${points.length === 1 ? '' : 's'} within ${radius} m. Tap an icon to see the walking route.`
       : `No amenities within ${radius} m.`;
 
-    ro = new ResizeObserver(() => {
-      if (!map) return;
-      map.invalidateSize();
-      if (!routeLayer) map.fitBounds(bounds); // đừng reset nếu đang xem lộ trình
+    watchResize();
+  }
+
+  // ---------- Chế độ comps: căn đã bán (CMA) ----------
+  function selectComp(id) {
+    const entry = compMarkers.get(id);
+    if (!entry) return;
+
+    if (activeCompId != null) {
+      const prev = compMarkers.get(activeCompId);
+      if (prev) {
+        const el = prev.marker.getElement();
+        if (el && el.firstChild) el.firstChild.classList.remove('active');
+        prev.marker.setZIndexOffset(0);
+      }
+    }
+    activeCompId = id;
+
+    const el = entry.marker.getElement();
+    if (el && el.firstChild) el.firstChild.classList.add('active');
+    entry.marker.setZIndexOffset(500);
+    map.panTo(entry.marker.getLatLng());
+
+    const p = entry.point;
+    info.innerHTML = `🏠 <strong>${esc(p.title)}</strong>${p.subtitle ? ` — ${esc(p.subtitle)}` : ''}`;
+  }
+
+  function renderComps(payload) {
+    const { center, points } = payload;
+    resetMap();
+
+    const all = [];
+
+    if (center) {
+      const c = [center.lat, center.lng];
+      L.marker(c, { icon: pin('🏠', 'house'), zIndexOffset: 1000 }).addTo(map).bindTooltip('This property');
+      all.push(c);
+    }
+
+    points.forEach(p => {
+      const m = L.marker([p.lat, p.lng], { icon: priceIcon(p.label) }).addTo(map);
+      m.bindTooltip(p.title);
+      m.on('click', () => {
+        selectComp(p.id);
+        window.parent.postMessage({ type: 'MB_COMP_SELECT', id: p.id }, '*');
+      });
+      compMarkers.set(p.id, { marker: m, point: p });
+      all.push([p.lat, p.lng]);
     });
-    ro.observe(document.getElementById('map'));
+
+    if (all.length > 1) {
+      bounds = L.latLngBounds(all).pad(0.15);
+      map.fitBounds(bounds);
+    } else if (all.length === 1) {
+      map.setView(all[0], 16);
+    } else {
+      map.setView([-33.8688, 151.2093], 12); // Sydney, chỉ để bản đồ không trống
+    }
+
+    info.textContent = points.length
+      ? `${points.length} sold nearby. Click a price tag for details.`
+      : 'No map locations are available for these sales.';
+
+    watchResize();
+  }
+
+  function render(payload) {
+    if (payload.mode === 'comps') renderComps(payload);
+    else renderAmenities(payload);
   }
 
   window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'MB_MAP_DATA') render(e.data.payload);
+    if (!e.data) return;
+    if (e.data.type === 'MB_MAP_DATA') render(e.data.payload);
+    // Cha yêu cầu chọn 1 căn (khi bấm vào danh sách bên ngoài)
+    if (e.data.type === 'MB_MAP_SELECT' && map) selectComp(e.data.id);
   });
 
   window.parent.postMessage({ type: 'MB_MAP_READY' }, '*');
