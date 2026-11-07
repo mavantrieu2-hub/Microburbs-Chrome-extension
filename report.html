@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microburbs | Property Intelligence Report</title>
+<style>
+:root{
+  --navy:#172746;--navy2:#20365d;--blue:#3478d4;--blue-soft:#eaf2ff;
+  --ink:#1d2939;--muted:#667085;--line:#e4e9f1;--surface:#fff;--canvas:#f4f6fa;
+  --green:#16835d;--green-bg:#e8f6ef;--amber:#a96710;--amber-bg:#fff4df;
+  --red:#bd4141;--red-bg:#fff0ef;--purple:#7454b5;--shadow:0 8px 26px rgba(24,39,70,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--canvas);color:var(--ink);font:14px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+button,input{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.app{min-height:100vh}
+.topbar{height:68px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 30px;position:sticky;top:0;z-index:20;box-shadow:0 3px 14px #12213a22}
+.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.2px}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:#fff;color:var(--blue);display:grid;place-items:center;font-size:19px}
+.brand small{display:block;color:#b9c9e2;font-size:9px;letter-spacing:2px;font-weight:700;margin-top:1px}
+.top-actions{display:flex;align-items:center;gap:9px}
+.btn{border:1px solid #ffffff42;border-radius:8px;background:#ffffff12;color:#fff;padding:8px 13px;font-weight:650;font-size:12px}
+.btn.primary{background:#fff;color:var(--navy);border-color:#fff}
+.btn:disabled{opacity:.55;cursor:wait}
+.layout{display:grid;grid-template-columns:245px minmax(0,1fr);max-width:1600px;margin:auto}
+.sidebar{padding:24px 16px 30px 22px;position:sticky;top:68px;height:calc(100vh - 68px);overflow:auto;border-right:1px solid var(--line);background:#f8f9fc}
+.side-label{font-size:9px;font-weight:800;letter-spacing:1.8px;color:#8a95a8;margin:16px 10px 8px}
+.nav-link{display:flex;gap:10px;align-items:center;padding:9px 11px;border-radius:8px;color:#536176;font-size:12px;font-weight:650;margin:2px 0}
+.nav-link:hover,.nav-link.active{background:#e9eff9;color:var(--navy)}
+.nav-dot{width:7px;height:7px;border-radius:50%;background:#9aa8bc;flex:none}
+.nav-link.active .nav-dot{background:var(--blue)}
+.main{padding:28px 34px 70px;min-width:0}
+.preview-banner{background:var(--amber-bg);border:1px solid #f2d69e;color:#80520d;border-radius:9px;padding:10px 14px;margin-bottom:18px;font-size:12px}
+.hero{background:linear-gradient(115deg,#172746,#284675);border-radius:15px;color:#fff;padding:27px 30px;margin-bottom:20px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid #ffffff18;border-radius:50%;right:-70px;top:-150px;box-shadow:0 0 0 34px #ffffff08,0 0 0 68px #ffffff06}
+.eyebrow{font-size:9px;letter-spacing:2.3px;font-weight:800;color:#b9c9e2;text-transform:uppercase}
+.hero h1{font-size:27px;line-height:1.2;margin:9px 0 5px;letter-spacing:-.6px}
+.hero .sub{color:#d3def0;font-size:13px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:17px}
+.meta-chip{background:#ffffff16;border:1px solid #ffffff22;padding:6px 10px;border-radius:6px;font-size:10px;color:#e4ebf7}
+.hero-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;position:relative;z-index:1}
+.hero-summary{max-width:700px}
+.hero-stamp{text-align:right;color:#b9c9e2;font-size:10px;min-width:120px}
+.hero-stamp strong{display:block;color:#fff;font-size:13px;margin-top:3px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 23px}
+.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:15px 16px;box-shadow:var(--shadow);min-width:0}
+.stat-label{font-size:9px;color:#8290a4;font-weight:800;letter-spacing:1.3px;text-transform:uppercase}
+.stat-value{font-size:22px;line-height:1.25;font-weight:800;color:var(--navy);margin-top:7px;overflow-wrap:anywhere}
+.stat-note{font-size:10px;color:var(--muted);margin-top:4px}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 23px;margin:0 0 17px;box-shadow:var(--shadow);scroll-margin-top:88px}
+.section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:17px}
+.section-kicker{font-size:9px;letter-spacing:1.8px;text-transform:uppercase;color:var(--blue);font-weight:800}
+.section h2{font-size:18px;letter-spacing:-.25px;margin:3px 0 0;color:var(--navy)}
+.section-desc{font-size:11px;color:var(--muted);margin-top:4px}
+.status{font-size:9px;font-weight:800;letter-spacing:.5px;border-radius:30px;padding:5px 9px;white-space:nowrap;background:var(--blue-soft);color:var(--blue)}
+.status.live{background:var(--green-bg);color:var(--green)}
+.status.partial{background:var(--amber-bg);color:var(--amber)}
+.status.planned{background:#f0edfa;color:var(--purple)}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.info-card{border:1px solid var(--line);border-radius:9px;padding:14px;background:#fff;min-width:0}
+.info-card h3{font-size:11px;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin:0 0 10px}
+.data-list{display:grid;gap:0}
+.data-row{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;padding:9px 0;border-bottom:1px solid #eef1f5;font-size:11px}
+.data-row:last-child{border-bottom:0}
+.data-row span:first-child{color:var(--muted)}
+.data-row strong{text-align:right;color:var(--ink);font-weight:750;overflow-wrap:anywhere}
+.callout{border-radius:9px;padding:12px 14px;font-size:11px;margin-top:13px}
+.callout.info{background:#eff5ff;color:#315d9d;border:1px solid #d9e7fb}
+.callout.warn{background:var(--amber-bg);color:#80520d;border:1px solid #f2d69e}
+.callout.good{background:var(--green-bg);color:#166748;border:1px solid #ccebd9}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:10px;min-width:620px}
+th{background:#f3f6fa;color:#58677d;text-align:left;font-size:9px;letter-spacing:.6px;text-transform:uppercase;padding:10px 11px;white-space:nowrap}
+td{padding:10px 11px;border-top:1px solid #edf0f4;vertical-align:top}
+tbody tr:nth-child(even){background:#fbfcfe}
+.empty-state{border:1px dashed #cbd4e1;background:#f9fbfd;border-radius:9px;padding:18px;color:#6c788b;font-size:11px}
+.empty-state strong{display:block;color:#39475b;font-size:12px;margin-bottom:4px}
+.pill-list{display:flex;flex-wrap:wrap;gap:7px}
+.pill{font-size:10px;border:1px solid var(--line);border-radius:30px;padding:5px 9px;background:#f9fafc;color:#44536a}
+.score-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.score{border:1px solid var(--line);border-radius:9px;padding:13px;text-align:center}
+.score strong{display:block;color:var(--navy);font-size:23px;line-height:1.2}
+.score span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.score small{display:block;font-size:9px;color:#7a8799;margin-top:4px}
+.zone-bar{display:flex;height:16px;overflow:hidden;border-radius:30px;background:#edf0f5;margin:10px 0}
+.zone-bar span{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:13px;font-size:10px;color:#59677a}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.risk-row{display:grid;grid-template-columns:150px minmax(80px,1fr) 130px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #edf0f4;font-size:10px}
+.risk-row:last-child{border-bottom:0}
+.risk-track{height:7px;background:#eef1f5;border-radius:30px;overflow:hidden}
+.risk-track span{display:block;height:100%;background:#e3a23b;border-radius:30px}
+.risk-value{text-align:right;font-weight:700;color:#49566b}
+.school-name{font-weight:750;color:#25334a}
+.muted{color:var(--muted)}
+.footer{padding:18px 4px 0;color:#8591a3;font-size:9px;display:flex;justify-content:space-between;gap:10px}
+.search-row{display:flex;gap:8px;max-width:620px;margin-top:15px}
+.search-row input{min-width:0;flex:1;border:1px solid #ffffff44;border-radius:7px;background:#ffffff12;color:#fff;padding:9px 11px;outline:none;font-size:11px}
+.search-row input::placeholder{color:#c6d1e2}
+.search-row button{border:0;border-radius:7px;background:#fff;color:var(--navy);padding:8px 14px;font-size:11px;font-weight:800}
+.loading-line{font-size:11px;color:#d5e1f2;margin-top:9px}
+.hidden{display:none!important}
+@media(max-width:1050px){.layout{grid-template-columns:205px minmax(0,1fr)}.main{padding:22px}.stats-grid{grid-template-columns:repeat(2,1fr)}.score-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.topbar{padding:0 14px}.layout{display:block}.sidebar{position:relative;top:auto;height:auto;display:flex;overflow:auto;padding:8px 12px;border-right:0;border-bottom:1px solid var(--line);gap:4px}.side-label{display:none}.nav-link{white-space:nowrap;padding:8px}.main{padding:16px}.hero{padding:22px 19px}.hero h1{font-size:22px}.hero-bottom{display:block}.hero-stamp{text-align:left;margin-top:14px}.grid-2,.grid-3{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(2,1fr)}.section{padding:17px}.risk-row{grid-template-columns:115px minmax(50px,1fr) 90px}.top-actions .btn{padding:7px 9px}}
+@media print{
+  @page{size:A4;margin:13mm}
+  body{background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .topbar,.sidebar,.top-actions,.search-row{display:none!important}
+  .layout{display:block;max-width:none}
+  .main{padding:0}
+  .hero,.section,.stat-card{box-shadow:none;break-inside:avoid}
+  .section{margin-bottom:10px;padding:15px}
+  .stats-grid{grid-template-columns:repeat(4,1fr)}
+  .footer{display:flex}
+  a{color:inherit}
+  .preview-banner{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">⌂</div>
+      <div>Microburbs<small>PROPERTY INTELLIGENCE</small></div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="refreshBtn" type="button">Refresh data</button>
+      <button class="btn primary" type="button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div>
+        <div class="side-label">REPORT</div>
+        <a class="nav-link active" href="#overview"><i class="nav-dot"></i> Property snapshot</a>
+        <a class="nav-link" href="#market"><i class="nav-dot"></i> Market overview</a>
+        <a class="nav-link" href="#sale-history"><i class="nav-dot"></i> Sale history & liveability</a>
+        <a class="nav-link" href="#pocket"><i class="nav-dot"></i> Pocket analysis</a>
+        <a class="nav-link" href="#risks"><i class="nav-dot"></i> Risk & noise</a>
+        <a class="nav-link" href="#development"><i class="nav-dot"></i> Development applications</a>
+        <a class="nav-link" href="#zoning"><i class="nav-dot"></i> Zoning & easements</a>
+        <a class="nav-link" href="#schools"><i class="nav-dot"></i> Schools & catchments</a>
+        <a class="nav-link" href="#amenities"><i class="nav-dot"></i> Amenities & walkability</a>
+        <a class="nav-link" href="#demographics"><i class="nav-dot"></i> Demographics</a>
+        <a class="nav-link" href="#comparables"><i class="nav-dot"></i> Nearby sales</a>
+        <a class="nav-link" href="#investment"><i class="nav-dot"></i> Investment analysis</a>
+        <div class="side-label">REFERENCE</div>
+        <a class="nav-link" href="#methodology"><i class="nav-dot"></i> Methodology & disclaimer</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="previewBanner" class="preview-banner">
+        <strong>Preview report.</strong> This page is using example values transcribed from the supplied 15 Rengor Close PDF. It is not a live property lookup. Add this file to the extension folder and open it with an <code>?address=...</code> or <code>?gnafId=...</code> parameter to load live extension data.
+      </div>
+
+      <section class="hero" id="overview">
+        <div class="hero-bottom">
+          <div class="hero-summary">
+            <div class="eyebrow">Property intelligence report</div>
+            <h1 id="propertyAddress">15 Rengor Close</h1>
+            <div class="sub" id="propertySuburb">Belmont North, NSW 2280</div>
+            <div class="hero-meta">
+              <span class="meta-chip" id="reportDate">Report date · 03 November 2026</span>
+              <span class="meta-chip" id="gnafChip">GNAF ID · Not loaded</span>
+              <span class="meta-chip" id="propertyTypeChip">Property type · Not available</span>
+            </div>
+            <form class="search-row" id="searchForm">
+              <input id="addressInput" type="text" placeholder="Enter property address or GNAF ID to load live data">
+              <button type="submit">Generate report</button>
+            </form>
+            <div id="loadStatus" class="loading-line">Preview mode · sample PDF data</div>
+          </div>
+          <div class="hero-stamp">
+            PREPARED BY
+            <strong>Microburbs Chrome Extension</strong>
+            <div style="margin-top:8px">BUYER & INVESTOR VIEW</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="stats-grid" id="snapshotStats">
+        <div class="stat-card"><div class="stat-label">Last sold (sample PDF)</div><div class="stat-value">$1,300,000</div><div class="stat-note">Value shown on supplied report cover</div></div>
+        <div class="stat-card"><div class="stat-label">Bedrooms</div><div class="stat-value">4</div><div class="stat-note">Property basics</div></div>
+        <div class="stat-card"><div class="stat-label">Bathrooms</div><div class="stat-value">2</div><div class="stat-note">Property basics</div></div>
+        <div class="stat-card"><div class="stat-label">Garage</div><div class="stat-value">3</div><div class="stat-note">Parking spaces shown on cover</div></div>
+      </div>
+
+      <section class="section">
+        <div class="section-head">
+          <div><div class="section-kicker">01 · Executive summary</div><h2>Property at a glance</h2><div class="section-desc">A concise view of the information currently available for this property.</div></div>
+          <span class="status partial" id="summaryStatus">Sample PDF data</span>
+        </div>
+        <div class="grid-2">
+          <div class="info-card"><h3>Property details</h3><div class="data-list" id="propertyFacts">
+            <div class="data-row"><span>Address</span><strong>15 Rengor Close, Belmont North NSW 2280</strong></div>
+            <div class="data-row"><span>Last sold value shown</span><strong>$1,300,000</strong></div>
+            <div class="data-row"><span>Bedrooms / bathrooms</span><strong>4 / 2</strong></div>
+            <div class="data-row"><span>Garage</span><strong>3 spaces</strong></div>
+          </div></div>
+          <div class="info-card"><h3>Key liveability indicators</h3><div class="score-grid" id="liveabilityScores">
+            <div class="score"><strong>76</strong><span>Convenience</span><small>Above average</small></div>
+            <div class="score"><strong>86</strong><span>Safety</span><small>Extremely low crime levels</small></div>
+            <div class="score"><strong>78</strong><span>Lifestyle</span><small>Above average</small></div>
+            <div class="score"><strong>83</strong><span>Tranquility</span><small>High</small></div>
+          </div></div>
+        </div>
+        <div class="callout info" id="executiveNote">The sample PDF provides property basics and several suburb-level liveability indicators. The extension's current live API flow does not yet retrieve all of these report sections. No overall buy / avoid recommendation is generated from incomplete data.</div>
+      </section>
+
+      <section class="section" id="market">
+        <div class="section-head"><div><div class="section-kicker">02 · Market data</div><h2>Market overview</h2><div class="section-desc">Suburb-level sale prices, rental levels, growth and market activity.</div></div><span class="status planned">Not connected</span></div>
+        <div class="empty-state"><strong>Market endpoints are not yet called by the current extension.</strong> Planned fields: median sale price, median rent, historical price and rent series, price growth, rent growth, gross yield, days on market, transaction volume, vacancy rate and stock on market. These must be labelled as suburb-level data, not property-level values.</div>
+      </section>
+
+      <section class="section" id="sale-history">
+        <div class="section-head"><div><div class="section-kicker">03 · Property & location</div><h2>Sale history & liveability</h2><div class="section-desc">Property transaction records and suburb liveability scorecards.</div></div><span class="status planned">Not connected</span></div>
+        <div class="grid-2">
+          <div class="info-card"><h3>Property transaction history</h3><div class="empty-state">The current background router does not call the property's sale-history endpoint. The $1,300,000 figure on the sample PDF cover is retained as a source value, but its transaction date is not inferred here.</div></div>
+          <div class="info-card"><h3>Location indicators from sample PDF</h3><div class="data-list">
+            <div class="data-row"><span>Hilliness</span><strong>23 / 100 · Some hills</strong></div>
+            <div class="data-row"><span>Distance to CBD</span><strong>137 km · Sydney</strong></div>
+            <div class="data-row"><span>Nearest hub</span><strong>14 km · Newcastle</strong></div>
+            <div class="data-row"><span>Hip score</span><strong>59 / 100 · Average</strong></div>
+          </div></div>
+        </div>
+      </section>
+
+      <section class="section" id="pocket">
+        <div class="section-head"><div><div class="section-kicker">04 · Market data</div><h2>Pocket analysis</h2><div class="section-desc">Compare smaller neighbourhood pockets within and around the suburb.</div></div><span class="status planned">Not connected</span></div>
+        <div class="empty-state"><strong>Not available in the current extension UI.</strong> Planned presentation: median house-price map by pocket, weekly price movement and comparison against nearby market areas. The supplied API inventory recorded no data for some pocket-map endpoints in its test run, so the report should support a clear no-data state.</div>
+      </section>
+
+      <section class="section" id="risks">
+        <div class="section-head"><div><div class="section-kicker">05 · Location & lifestyle</div><h2>Risk & noise</h2><div class="section-desc">Mapped hazards and neighbourhood factors returned for the selected property.</div></div><span class="status live" id="riskStatus">Sample PDF reference</span></div>
+        <div id="riskContent">
+          <div class="grid-2">
+            <div class="info-card"><h3>Risk observations in sample PDF</h3><div class="data-list">
+              <div class="data-row"><span>Landslide</span><strong>None nearby</strong></div>
+              <div class="data-row"><span>Mobile black spot</span><strong>None nearby</strong></div>
+              <div class="data-row"><span>HV power line</span><strong>None nearby</strong></div>
+            </div></div>
+            <div class="info-card"><h3>Other risk layers</h3><div class="empty-state">Fire, flood, heritage and public-housing layers are listed in the sample report, but the extracted text does not provide a reliable status for each one.</div></div>
+          </div>
+          <div class="callout warn">The current extension retrieves mapped risk overlays, but it does not currently include the sample report's noise heatmap or busy-road layer. A mapped result is not a site inspection, insurance quote or legal assessment.</div>
+        </div>
+      </section>
+
+      <section class="section" id="development">
+        <div class="section-head"><div><div class="section-kicker">06 · Development</div><h2>Development applications</h2><div class="section-desc">Proposed and approved developments near the subject property.</div></div><span class="status planned">Not connected</span></div>
+        <div class="empty-state"><strong>Development application data is not currently rendered by the extension.</strong> Planned fields: address/place, application type, development details, lodgement or decision date, status where available, and distance from the subject property. Nearby applications should be spatially filtered; a suburb-wide list must not be presented as if every project is adjacent to the property.</div>
+      </section>
+
+      <section class="section" id="zoning">
+        <div class="section-head"><div><div class="section-kicker">07 · Development</div><h2>Zoning & easements</h2><div class="section-desc">Land-use classification and potential restrictions on development.</div></div><span class="status planned">Not connected</span></div>
+        <div class="grid-2">
+          <div class="info-card"><h3>Zoning distribution in sample PDF</h3>
+            <div class="zone-bar"><span style="width:54.4%;background:#c75ac2"></span><span style="width:34.3%;background:#36966d"></span><span style="width:11.3%;background:#9ba5b4"></span></div>
+            <div class="legend"><span><i style="background:#c75ac2"></i>Residential 54.4%</span><span><i style="background:#36966d"></i>Environmental 34.3%</span><span><i style="background:#9ba5b4"></i>Other 11.3%</span></div>
+          </div>
+          <div class="info-card"><h3>Extension integration</h3><div class="empty-state">Zoning code, zoning overlays and easement geometry are not yet connected to the report UI. The percentages shown here are from the sample PDF and are suburb-area distribution, not a confirmed zoning classification for the subject lot.</div></div>
+        </div>
+      </section>
+
+      <section class="section" id="schools">
+        <div class="section-head"><div><div class="section-kicker">08 · Location & lifestyle</div><h2>Schools & catchments</h2><div class="section-desc">Nearby school results. Catchment membership is separate from straight-line distance.</div></div><span class="status live" id="schoolStatus">Sample PDF reference</span></div>
+        <div id="schoolContent">
+          <div class="table-wrap"><table><thead><tr><th>School</th><th>In catchment</th><th>Distance</th><th>Level</th><th>NAPLAN</th></tr></thead><tbody>
+            <tr><td class="school-name">Floraville Public School</td><td>Yes</td><td>834 m</td><td>Primary</td><td>Top 45%</td></tr>
+            <tr><td class="school-name">Belmont North Public School</td><td>No</td><td>1.0 km</td><td>Primary</td><td>Top 37%</td></tr>
+            <tr><td class="school-name">Jewells Primary School</td><td>No</td><td>1.9 km</td><td>Primary</td><td>Top 31%</td></tr>
+            <tr><td class="school-name">Windale Public School</td><td>No</td><td>2.2 km</td><td>Primary</td><td>Bottom 7%</td></tr>
+            <tr><td class="school-name">Belmont High School</td><td>Yes</td><td>2.0 km</td><td>Secondary</td><td>Bottom 43%</td></tr>
+            <tr><td class="school-name">Hunter Sports High School</td><td>No</td><td>3.5 km</td><td>Secondary</td><td>Bottom 41%</td></tr>
+          </tbody></table></div>
+          <div class="callout info">The current extension fetches school names, distance, sector, level and several performance labels. Catchment polygons and the “in catchment” field are not currently rendered in the extension.</div>
+        </div>
+      </section>
+
+      <section class="section" id="amenities">
+        <div class="section-head"><div><div class="section-kicker">09 · Location & lifestyle</div><h2>Nearby amenities & walkability</h2><div class="section-desc">Nearby services and transport returned by the current API integration.</div></div><span class="status live" id="amenityStatus">Sample PDF reference</span></div>
+        <div id="amenityContent">
+          <div class="grid-3">
+            <div class="info-card"><h3>Green spaces</h3><div class="stat-value">288 m</div><div class="stat-note">Nearest green space in sample PDF</div></div>
+            <div class="info-card"><h3>School</h3><div class="stat-value">832 m</div><div class="stat-note">Floraville Public School</div></div>
+            <div class="info-card"><h3>Bus stop</h3><div class="stat-value">927 m</div><div class="stat-note">Nearest bus stop in sample PDF</div></div>
+          </div>
+          <div class="callout warn">Important: the current nearby API distance field is not necessarily a pedestrian route distance. The extension's current report data does not include a validated walking-time or step-count field. Keep straight-line/API distance separate from walking-network distance.</div>
+        </div>
+      </section>
+
+      <section class="section" id="demographics">
+        <div class="section-head"><div><div class="section-kicker">10 · Demographics</div><h2>Demographic profile</h2><div class="section-desc">Age, income, population and household profile for the suburb.</div></div><span class="status planned">Not connected</span></div>
+        <div class="grid-2">
+          <div class="info-card"><h3>Median income in sample PDF</h3><div class="stat-value">$90k</div><div class="stat-note">The sample report labels this as median income; period and household/person basis are not clear in the extracted text.</div></div>
+          <div class="info-card"><h3>Planned data</h3><div class="empty-state">Age distribution, income brackets, population history, ancestry and birthplace distribution. Each chart should display its data year and geographic level.</div></div>
+        </div>
+      </section>
+
+      <section class="section" id="comparables">
+        <div class="section-head"><div><div class="section-kicker">11 · Nearby sales</div><h2>Nearby sales & comparables</h2><div class="section-desc">Comparable properties returned for the subject property.</div></div><span class="status live" id="compsStatus">Sample PDF reference</span></div>
+        <div id="compsContent">
+          <div class="empty-state"><strong>The supplied PDF contains a nearby-sales map and a 32-row table.</strong> Some addresses and values were not reliably readable in the extracted PDF text, so this preview does not reproduce those records. The live extension can load CMA comparables and show sale date, price, bedrooms, bathrooms, garage spaces, property type and available map coordinates.</div>
+        </div>
+      </section>
+
+      <section class="section" id="investment">
+        <div class="section-head"><div><div class="section-kicker">12 · Investor analysis</div><h2>Investment analysis</h2><div class="section-desc">Rental evidence, gross yield, gearing status and estimated cash flow scenarios.</div></div><span class="status live" id="investmentStatus">Current extension feature</span></div>
+        <div id="investmentContent">
+          <div class="empty-state"><strong>Investment data will load when this page is opened from the Chrome extension.</strong> The current extension supports negative-gearing outputs and latest rent observation. It should display the assumptions and source date alongside each calculated figure.</div>
+        </div>
+      </section>
+
+      <section class="section" id="methodology">
+        <div class="section-head"><div><div class="section-kicker">13 · Reference</div><h2>Methodology, data quality & disclaimer</h2><div class="section-desc">How to interpret this report and its limitations.</div></div><span class="status">Required disclosure</span></div>
+        <div class="grid-2">
+          <div class="info-card"><h3>Data interpretation</h3><div class="data-list">
+            <div class="data-row"><span>Property-level</span><strong>One specific property</strong></div>
+            <div class="data-row"><span>Suburb-level</span><strong>Whole suburb profile</strong></div>
+            <div class="data-row"><span>Comparable median</span><strong>Median of returned CMA set</strong></div>
+            <div class="data-row"><span>Nearby distance</span><strong>Use API's stated distance method</strong></div>
+          </div></div>
+          <div class="info-card"><h3>Important limitations</h3><div class="data-list">
+            <div class="data-row"><span>Missing data</span><strong>Shown as unavailable, not zero</strong></div>
+            <div class="data-row"><span>Data freshness</span><strong>Check the timestamp per data source</strong></div>
+            <div class="data-row"><span>Investment metrics</span><strong>Estimates based on assumptions</strong></div>
+            <div class="data-row"><span>Risk overlays</span><strong>Not a site or legal assessment</strong></div>
+          </div></div>
+        </div>
+        <div class="callout warn">This report is for informational purposes only. AVM, rental, yield and cash-flow outputs are estimates based on available data and assumptions. They are not a formal valuation, financial advice, legal advice, building inspection, insurance assessment or guarantee of future performance. Verify critical details independently with qualified professionals and relevant authorities before making a purchase or investment decision.</div>
+      </section>
+
+      <div class="footer"><span>Microburbs Chrome Extension · Property Intelligence Report</span><span id="footerDate">Report generated · 07 November 2026</span></div>
+    </main>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const money = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && v !== null && v !== "" ? new Intl.NumberFormat("en-AU",{style:"currency",currency:"AUD",maximumFractionDigits:0}).format(n) : "Not available";
+  };
+  const num = (v) => v === null || v === undefined || v === "" ? null : Number(v);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const fmtDate = (v) => {
+    if (!v) return "Not available";
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"});
+  };
+  const dist = (v) => {
+    const n = num(v);
+    if (n === null) return "Not available";
+    return n >= 1000 ? `${(n/1000).toFixed(1)} km` : `${Math.round(n)} m`;
+  };
+  const row = (label,value,note="") => `<div class="data-row"><span>${esc(label)}${note ? `<small class="muted"> · ${esc(note)}</small>` : ""}</span><strong>${value == null || value === "" ? "Not available" : value}</strong></div>`;
+  const empty = (title,desc) => `<div class="empty-state"><strong>${esc(title)}</strong>${esc(desc)}</div>`;
+  const inExtension = () => location.protocol === "chrome-extension:" && window.chrome && chrome.runtime && chrome.runtime.sendMessage;
+
+  const send = (action,payload={}) => new Promise(resolve => {
+    if (!inExtension()) return resolve({error:true,message:"Chrome extension runtime is unavailable."});
+    chrome.runtime.sendMessage({action,...payload},response => {
+      if (chrome.runtime.lastError) resolve({error:true,message:chrome.runtime.lastError.message});
+      else resolve(response || {error:true,message:"No response from extension background service."});
+    });
+  });
+
+  const DEMO = {
+    summary:{
+      error:false,matchedAddress:"15 Rengor Close, Belmont North NSW 2280",gnafId:null,
+      avmEstimate:null,avmLow:null,avmHigh:null,confidenceScore:null,bedCount:4,bathCount:2,parkingCount:3,
+      dwellingType:null,landAreaSqm:null
+    },
+    investment:null,nearby:null,comps:null,risks:null
+  };
+
+  function setStatus(text){ $("loadStatus").textContent = text; }
+  function setBadge(id,text,cls="live"){ const el=$(id); if(el){el.textContent=text;el.className=`status ${cls}`;} }
+  function setPreviewMode(){
+    $("previewBanner").classList.remove("hidden");
+    $("searchForm").classList.add("hidden");
+    setStatus("Preview mode · sample PDF data · not a live API response");
+  }
+
+  function renderSummary(s){
+    const address=s.matchedAddress || s.rawAddress || "Property address not available";
+    $("propertyAddress").textContent = address.split(",")[0] || address;
+    $("propertySuburb").textContent = address.includes(",") ? address.substring(address.indexOf(",")+1).trim() : "Address matched";
+    $("gnafChip").textContent = `GNAF ID · ${s.gnafId || "Not available"}`;
+    $("propertyTypeChip").textContent = `Property type · ${s.dwellingType || "Not available"}`;
+    const stats = [
+      ["Estimated value",money(s.avmEstimate),s.avmEstDate ? `Estimate date · ${fmtDate(s.avmEstDate)}` : "AVM estimate"],
+      ["Bedrooms",s.bedCount ?? "Not available","Property basics"],
+      ["Bathrooms",s.bathCount ?? "Not available","Property basics"],
+      ["Parking",s.parkingCount ?? "Not available","Parking spaces"]
+    ];
+    $("snapshotStats").innerHTML=stats.map(([l,v,n])=>`<div class="stat-card"><div class="stat-label">${esc(l)}</div><div class="stat-value">${esc(v)}</div><div class="stat-note">${esc(n)}</div></div>`).join("");
+    $("propertyFacts").innerHTML=[
+      row("Matched address",esc(address)),
+      row("GNAF ID",esc(s.gnafId || "Not available")),
+      row("Estimated value",money(s.avmEstimate),s.avmEstDate ? `As at ${fmtDate(s.avmEstDate)}` : ""),
+      row("Estimated range",s.avmLow != null && s.avmHigh != null ? `${money(s.avmLow)} – ${money(s.avmHigh)}` : "Not available"),
+      row("Confidence",s.confidenceScore != null ? `${esc(s.confidenceScore)}%` : "Not available"),
+      row("Dwelling type",esc(s.dwellingType || "Not available")),
+      row("Land area",s.landAreaSqm != null ? `${esc(s.landAreaSqm)} m²` : "Not available"),
+      row("Bedrooms / bathrooms",`${esc(s.bedCount ?? "N/A")} / ${esc(s.bathCount ?? "N/A")}`),
+      row("Parking",s.parkingCount != null ? `${esc(s.parkingCount)} spaces` : "Not available")
+    ].join("");
+    $("summaryStatus").textContent="Live property lookup";
+    $("summaryStatus").className="status live";
+    $("executiveNote").textContent="The property snapshot is loaded from the current extension's address matching, AVM and property-basics flow. Other sections below are populated only when the corresponding current extension API returns data; unavailable values are not treated as zero.";
+  }
+
+  function renderSchools(nearby){
+    const schools=Array.isArray(nearby?.schools)?nearby.schools:[];
+    if(!schools.length){$("schoolContent").innerHTML=empty("No school results returned.","The API did not return school records for this property.");setBadge("schoolStatus","No data","partial");return;}
+    const body=schools.map(s=>{
+      const name=s.name || s.school_name || s.title || "Unnamed school";
+      const distance=s.distance_m ?? s.distance ?? s.distance_km;
+      const d=distance != null && s.distance_km != null ? `${Number(s.distance_km).toFixed(1)} km` : dist(distance);
+      const level=s.level || s.school_level || s.type || s.sector || "Not available";
+      const nap=s.naplan_label || s.naplan || s.performance_label || "Not available";
+      const sector=s.sector || s.school_sector || "";
+      return `<tr><td class="school-name">${esc(name)}</td><td>${esc(sector || "Not returned")}</td><td>${esc(d)}</td><td>${esc(level)}</td><td>${esc(nap)}</td></tr>`;
+    }).join("");
+    $("schoolContent").innerHTML=`<div class="table-wrap"><table><thead><tr><th>School</th><th>Sector</th><th>Distance (API)</th><th>Level</th><th>Performance label</th></tr></thead><tbody>${body}</tbody></table></div><div class="callout info">The current endpoint returns nearby/ranked school records. Catchment polygons and confirmed in-catchment status are not currently rendered by this extension report.</div>`;
+    setBadge("schoolStatus",`${schools.length} schools returned`,"live");
+  }
+
+  function renderAmenities(nearby){
+    const amen=nearby?.amenities;
+    const transport=nearby?.transport;
+    if(!amen && !transport){$("amenityContent").innerHTML=empty("No nearby data returned.","Amenities and transport endpoints did not return records.");setBadge("amenityStatus","No data","partial");return;}
+    const counts=amen?.counts || {};
+    const results=Array.isArray(amen?.results)?amen.results:[];
+    const nearest=transport?.nearest || {};
+    const countPills=Object.entries(counts).map(([k,v])=>`<span class="pill">${esc(k.replace(/_/g," "))}: <strong>${esc(v)}</strong></span>`).join("");
+    const amenRows=results.slice(0,20).map(a=>{
+      const name=a.name || a.title || a.amenity_name || a.category || a.type || "Amenity";
+      const cat=a.category || a.type || a.amenity_type || "Not classified";
+      const distance=a.distance_m ?? a.distance;
+      return `<tr><td>${esc(name)}</td><td>${esc(String(cat).replace(/_/g," "))}</td><td>${esc(dist(distance))}</td></tr>`;
+    }).join("");
+    const transRows=Object.entries(nearest).map(([k,v])=>{
+      const item=Array.isArray(v)?v[0]:v;
+      if(!item) return "";
+      const name=item.name || item.stop_name || item.title || "Nearest stop";
+      const d=item.distance_m ?? item.distance;
+      return `<tr><td>${esc(k)}</td><td>${esc(name)}</td><td>${esc(dist(d))}</td></tr>`;
+    }).join("");
+    $("amenityContent").innerHTML=`
+      ${countPills ? `<div class="pill-list" style="margin-bottom:13px">${countPills}</div>` : ""}
+      <div class="grid-2">
+        <div class="info-card"><h3>Nearby amenities</h3>${amenRows ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>API distance</th></tr></thead><tbody>${amenRows}</tbody></table></div>` : `<div class="empty-state">No individual amenity records returned.</div>`}</div>
+        <div class="info-card"><h3>Nearest transport</h3>${transRows ? `<div class="table-wrap"><table><thead><tr><th>Mode</th><th>Stop / station</th><th>API distance</th></tr></thead><tbody>${transRows}</tbody></table></div>` : `<div class="empty-state">No nearest transport records returned.</div>`}</div>
+      </div>
+      <div class="callout warn">Distances above are displayed from the API response. Do not label them as walking-network distances, walking time or step counts unless those metrics are separately calculated from a pedestrian routing network.</div>`;
+    setBadge("amenityStatus","Live nearby data","live");
+  }
+
+  function renderInvestment(gearing,rentRes){
+    if(!gearing || gearing.error){
+      $("investmentContent").innerHTML=empty("Investment data unavailable.",gearing?.message || "The negative-gearing endpoint did not return data.");
+      setBadge("investmentStatus","No data","partial");return;
+    }
+    const g=gearing.data || {};
+    let rent=rentRes && !rentRes.error ? rentRes.data : null;
+    if(Array.isArray(rent)) rent=rent[0];
+    rent=rent && typeof rent==="object" ? rent : {};
+    const rentKeys=["rent_pw","weekly_rent","rent_per_week","rent_weekly","rent","price","amount"];
+    const dateKeys=["date","date_listed","listing_date","observed_date","rent_date","date_observed","last_seen_date","last_seen"];
+    const rentKey=rentKeys.find(k=>num(rent[k])>0);
+    const dateKey=dateKeys.find(k=>rent[k]);
+    const cash80=g.net_cashflow_80lvr;
+    const cash105=g.net_cashflow_105lvr;
+    const cash80wk=g.net_cashflow_80lvr_wk;
+    const fields=[
+      row("Gearing status",g.is_negatively_geared===true?"Negatively geared":g.is_negatively_geared===false?"Not negatively geared":"Not available"),
+      row("Gross yield",num(g.gross_yield_pct)!=null?`${Number(g.gross_yield_pct).toFixed(2)}%`:"Not available"),
+      row("Default LVR",num(g.lvr_default)!=null?`${Math.round(Number(g.lvr_default)*100)}%`:"Not available"),
+      row("Latest rent",rentKey?`${money(rent[rentKey])}/week`:"Not available",dateKey?`Observed ${fmtDate(rent[dateKey])}`:""),
+      row("Yield on AVM",rentKey && window.liveSummary?.avmEstimate?`${(Number(rent[rentKey])*52/Number(window.liveSummary.avmEstimate)*100).toFixed(2)}%`:"Not available","Annualised rent divided by AVM estimate"),
+      row("Calculation level",esc(String(g.level || "Not available").replace(/_/g," ")))
+    ].join("");
+    const cash=[
+      row("Net cash flow · 80% LVR",cash80!=null?money(cash80):"Not available",cash80wk!=null?`${money(cash80wk)} per week`:""),
+      row("Net cash flow · 105% LVR",cash105!=null?money(cash105):"Not available","105% loan-to-value scenario")
+    ].join("");
+    $("investmentContent").innerHTML=`<div class="grid-2"><div class="info-card"><h3>Gearing & rental summary</h3><div class="data-list">${fields}</div></div><div class="info-card"><h3>Cash flow scenarios</h3><div class="data-list">${cash}</div></div></div>${g.rent_estimate_suspect?'<div class="callout warn">The API flags this rent estimate as suspect. Treat the rental and cash-flow outputs with additional caution.</div>':""}<div class="callout info">Figures are estimates from the API response and depend on its assumptions. Confirm loan rate, deposit, purchase costs, ongoing expenses, tax treatment and actual achievable rent independently.</div>`;
+    setBadge("investmentStatus","Live investment data","live");
+  }
+
+  function renderComparables(res){
+    if(!res || res.error){
+      $("compsContent").innerHTML=empty("Comparable sales unavailable.",res?.message || "The CMA endpoint did not return data.");
+      setBadge("compsStatus","No data","partial");return;
+    }
+    const raw=res.data;
+    const list=Array.isArray(raw)?raw:(raw?.results || raw?.comparables || raw?.data || []);
+    if(!list.length){$("compsContent").innerHTML=empty("No comparable sales returned.","No records were included in the CMA response.");setBadge("compsStatus","No sales returned","partial");return;}
+    const prices=list.map(x=>num(x.price)).filter(x=>x>0).sort((a,b)=>a-b);
+    const median=prices.length?(prices.length%2?prices[(prices.length-1)/2]:(prices[prices.length/2-1]+prices[prices.length/2])/2):null;
+    const body=list.slice(0,50).map(x=>{
+      const address=[x.street,x.sal].filter(Boolean).join(", ") || x.address || "Address not returned";
+      const date=x.date_sold || x.sold_date;
+      return `<tr><td>${esc(address)}</td><td>${esc(x.property_type || "Not available")}</td><td>${esc(money(x.price))}</td><td>${esc(fmtDate(date))}</td><td>${esc(x.bedrooms ?? "—")}</td><td>${esc(x.bathrooms ?? "—")}</td><td>${esc(x.garage_spaces ?? "—")}</td></tr>`;
+    }).join("");
+    $("compsContent").innerHTML=`<div class="grid-3" style="margin-bottom:13px"><div class="stat-card"><div class="stat-label">Sales returned</div><div class="stat-value">${list.length}</div></div><div class="stat-card"><div class="stat-label">Median of CMA set</div><div class="stat-value">${money(median)}</div><div class="stat-note">Median of returned comparables only</div></div><div class="stat-card"><div class="stat-label">Price range</div><div class="stat-value" style="font-size:16px">${prices.length?`${money(prices[0])} – ${money(prices[prices.length-1])}`:"Not available"}</div></div></div><div class="table-wrap"><table><thead><tr><th>Address</th><th>Type</th><th>Sale price</th><th>Sold date</th><th>Beds</th><th>Baths</th><th>Garage</th></tr></thead><tbody>${body}</tbody></table></div><div class="callout info">The median above is calculated from the returned CMA comparable set. It is not the suburb-wide median sale price. The source field date_sold is labelled “Sold date”, not “Listing date”.</div>`;
+    setBadge("compsStatus",`${list.length} comparable sales`,"live");
+  }
+
+  function renderRisks(res){
+    if(!res || res.error){
+      $("riskContent").innerHTML=empty("Risk data unavailable.",res?.message || "The risk endpoint did not return data.");
+      setBadge("riskStatus","No data","partial");return;
+    }
+    const data=res.data && typeof res.data==="object"?res.data:{};
+    const items=Object.entries(data).flatMap(([key,arr])=>{
+      if(!Array.isArray(arr)||!arr.length)return [];
+      const e=arr.find(x=>x.on_property)||[...arr].sort((a,b)=>(a.nearest_distance_m??1e9)-(b.nearest_distance_m??1e9))[0];
+      return [{key,e,arr}];
+    });
+    if(!items.length){$("riskContent").innerHTML=empty("No risk layers returned.","The risk API response contained no layer records.");setBadge("riskStatus","No layers returned","partial");return;}
+    const rows=items.map(({key,e,arr})=>{
+      const label=key.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+      const on=!!e.on_property;
+      const d=num(e.nearest_distance_m);
+      const radius=num(e.search_radius_m)||1000;
+      const none=!on && (e.features_within_radius===0 || d===null);
+      const value=on?"On property":none?`None in ${dist(radius)}`:dist(d);
+      const pct=on?0:none?100:Math.max(0,Math.min(100,d/radius*100));
+      const note=e.features_within_radius>0?`${e.features_within_radius} mapped feature(s) within search radius`:"";
+      return `<div class="risk-row"><strong>${esc(label)}</strong><div class="risk-track"><span style="width:${pct}%"></span></div><div class="risk-value">${esc(value)}${note?`<br><small class="muted">${esc(note)}</small>`:""}</div></div>`;
+    }).join("");
+    $("riskContent").innerHTML=`<div class="info-card"><h3>Returned risk layers</h3>${rows}</div><div class="callout warn">Bar length represents distance relative to the API search radius. Public-housing values are an area indicator, not a statement about individual residents. Risk layers do not replace council searches, building inspections or insurance checks.</div>`;
+    setBadge("riskStatus",`${items.length} risk layers`,"live");
+  }
+
+  function renderNearby(nearby){
+    if(!nearby || nearby.error){
+      $("schoolContent").innerHTML=empty("School data unavailable.",nearby?.message || "Nearby API request failed.");
+      $("amenityContent").innerHTML=empty("Nearby data unavailable.",nearby?.message || "Nearby API request failed.");
+      setBadge("schoolStatus","No data","partial");setBadge("amenityStatus","No data","partial");return;
+    }
+    renderSchools(nearby);renderAmenities(nearby);
+  }
+
+  async function loadLive(query){
+    if(!inExtension()){
+      setStatus("This file is open outside Chrome extension context. Add it to the extension folder to load live API data.");
+      return;
+    }
+    if(!query.trim()) return;
+    $("refreshBtn").disabled=true;
+    setStatus("Matching property address and loading Microburbs data…");
+    $("previewBanner").classList.add("hidden");
+    const isGnaf=/^G[A-Z0-9]+$/i.test(query.trim()) || query.trim().length>12;
+    const summary=await send(isGnaf?"FETCH_PROPERTY_BY_GNAF":"FETCH_PROPERTY_SUMMARY",isGnaf?{gnafId:query.trim()}:{address:query.trim()});
+    if(!summary || summary.error){
+      setStatus(`Property lookup failed: ${summary?.message || "No matching property."}`);
+      $("refreshBtn").disabled=false;
+      return;
+    }
+    window.liveSummary=summary;
+    renderSummary(summary);
+    setStatus(`Property matched · ${summary.matchedAddress || summary.gnafId} · loading available sections…`);
+    const id=summary.gnafId;
+    const [nearby,investment,comps,risks,rent]=await Promise.all([
+      send("FETCH_NEARBY",{gnafId:id}),
+      send("FETCH_NEGATIVE_GEARING",{gnafId:id}),
+      send("FETCH_CMA",{gnafId:id}),
+      send("FETCH_RISKS",{gnafId:id}),
+      send("FETCH_RENT_LATEST",{gnafId:id})
+    ]);
+    renderNearby(nearby);
+    renderInvestment(investment,rent);
+    renderComparables(comps);
+    renderRisks(risks);
+    $("reportDate").textContent=`Report generated · ${new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"})}`;
+    $("footerDate").textContent=`Report generated · ${new Date().toLocaleString("en-AU")}`;
+    setStatus("Live report loaded from the current Chrome extension APIs. Sections marked Not connected are not yet implemented.");
+    $("refreshBtn").disabled=false;
+  }
+
+  $("searchForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const q=$("addressInput").value.trim();
+    if(q) loadLive(q);
+  });
+  $("refreshBtn").addEventListener("click",()=>{
+    const q=new URLSearchParams(location.search).get("address") || new URLSearchParams(location.search).get("gnafId") || $("addressInput").value;
+    if(q) loadLive(q);
+  });
+
+  // If opened as an extension page with an address/GNAF query, fetch live data.
+  const params=new URLSearchParams(location.search);
+  const initial=params.get("address") || params.get("gnafId") || "";
+  if(inExtension()){
+    $("previewBanner").classList.add("hidden");
+    $("searchForm").classList.remove("hidden");
+    if(initial){$("addressInput").value=initial;loadLive(initial);}
+    else setStatus("Extension mode · enter a property address or GNAF ID to generate a live report.");
+    $("reportDate").textContent=`Report generated · ${new Date().toLocaleDateString("en-AU",{day:"2-digit",month:"long",year:"numeric"})}`;
+    $("footerDate").textContent=`Report generated · ${new Date().toLocaleDateString("en-AU")}`;
+  }else{
+    setPreviewMode();
+  }
+
+  // Active section highlight while navigating.
+  const links=[...document.querySelectorAll(".nav-link")];
+  const sections=links.map(a=>document.querySelector(a.getAttribute("href"))).filter(Boolean);
+  if("IntersectionObserver" in window){
+    const io=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          links.forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+entry.target.id));
+        }
+      });
+    },{rootMargin:"-20% 0px -70% 0px"});
+    sections.forEach(s=>io.observe(s));
+  }
+})();
+</script>
+</body>
+</html>
