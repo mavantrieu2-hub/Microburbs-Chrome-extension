@@ -100,14 +100,22 @@ Supporting services (no Microburbs data):
 
 **Match the home on screen to a GNAF ID, then use that ID as the single join key for every fact, and only pay for what the buyer actually opens.**
 
-```mermaid
-flowchart LR
-  A[Listing page on<br/>domain or realestate] -->|clean address| B[content.js]
-  B -->|FETCH_PROPERTY_SUMMARY| C[background.js<br/>service worker]
-  C -->|geocode to GNAF ID| D[(Microburbs API)]
-  C -->|AVM and basics| D
-  B -->|tab opened: nearby, gearing,<br/>rent, comps, risks| C
-  B -->|postMessage| E[map.html iframe<br/>Leaflet]
+```text
+ Listing page (domain.com.au / realestate.com.au)
+        |
+        |  clean address
+        v
+   content.js  ---------- postMessage ----------->  map.html iframe (Leaflet)
+        |
+        |  FETCH_PROPERTY_SUMMARY on arrival, then one message
+        |  per tab opened: nearby, gearing, rent, comps, risks
+        v
+   background.js (service worker, holds the API key)
+        |
+        |  1. geocode the address to a GNAF ID
+        |  2. AVM and basics, then tab data, all keyed by that same GNAF ID
+        v
+   Microburbs API
 ```
 
 What makes it work in practice:
